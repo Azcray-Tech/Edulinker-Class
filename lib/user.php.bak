@@ -1,0 +1,147 @@
+<?php
+include_once(__DIR__ . "/constants.php");
+
+### --- Funciones de autenticación y seguridad ---
+
+/**
+ * Verifica si el usuario está autenticado.
+ * Si no lo está, redirige a la página de inicio de sesión.
+ */
+function verificarAutenticacion() {
+    if (!isset($_SESSION["user_id"])) {
+        header("Location: login.php");
+        exit();
+    }
+}
+
+/**
+ * Genera un token CSRF para proteger formularios.
+ * @return string Token CSRF generado.
+ */
+function generarCSRFToken() {
+    return bin2hex(random_bytes(32));
+}
+
+/**
+ * Verifica si el token CSRF proporcionado es válido.
+ * @param string $token Token CSRF a verificar.
+ * @return bool True si el token es válido, false en caso contrario.
+ */
+function verificarCSRF($token) {
+    return isset($_SESSION['csrf_token']) && $_SESSION['csrf_token'] === $token;
+}
+
+### --- Funciones relacionadas con usuarios ---
+
+/**
+ * Obtiene los datos de un usuario por su ID.
+ * @param mysqli $conexion Conexión a la base de datos.
+ * @param int $user_id ID del usuario.
+ * @return array|null Datos del usuario o null si no se encuentra.
+ */
+function obtenerDatosUsuario($conexion, $user_id) {
+    $sql = "SELECT username, email, imagen, biografia, rol_id FROM users WHERE id = ?";
+    $stmt = mysqli_prepare($conexion, $sql);
+
+    if ($stmt) {
+        mysqli_stmt_bind_param($stmt, "i", $user_id);
+        mysqli_stmt_execute($stmt);
+        $result = mysqli_stmt_get_result($stmt);
+
+        if ($row = mysqli_fetch_assoc($result)) {
+            mysqli_stmt_close($stmt);
+            return $row;
+        }
+
+        mysqli_stmt_close($stmt);
+    }
+
+    return null;
+}
+
+/**
+ * Actualiza el perfil de un usuario, incluyendo su nombre, biografía e imagen de perfil.
+ * @param mysqli $conexion Conexión a la base de datos.
+ * @param int $user_id ID del usuario.
+ * @param array $data Datos del formulario (username, biografía).
+ * @param array $files Datos del archivo subido (imagen).
+ * @return array Resultado de la operación (éxito o error).
+ */
+function actualizarPerfilUsuario($conexion, $user_id, $data, $files) {
+    $username = $data["username"];
+    $biografia = $data["biografia"];
+    $imagen = null;
+
+    // Manejo de la imagen de perfil
+    if ($files["imagen"]["error"] == 0) {
+        $target_dir = __DIR__ . "/../uploads/profiles/";
+        $file_name = basename($files["imagen"]["name"]); // Solo el nombre del archivo
+        $target_file = $target_dir . $file_name;
+
+        // Verificar si la carpeta uploads/profiles existe
+        if (!is_dir($target_dir)) {
+            mkdir($target_dir, 0777, true); // Crear la carpeta si no existe
+        }
+
+        // Mover el archivo subido
+        if (move_uploaded_file($files["imagen"]["tmp_name"], $target_file)) {
+            $imagen = $file_name; // Guardar solo el nombre del archivo
+        } else {
+            return ["exito" => false, "error" => "Error al subir la imagen."];
+        }
+    }
+
+    // Actualizar los datos en la base de datos
+    $sql = "UPDATE users SET username = ?, biografia = ?" . ($imagen ? ", imagen = ?" : "") . " WHERE id = ?";
+    $stmt = mysqli_prepare($conexion, $sql);
+
+    if ($stmt) {
+        if ($imagen) {
+            mysqli_stmt_bind_param($stmt, "sssi", $username, $biografia, $imagen, $user_id);
+        } else {
+            mysqli_stmt_bind_param($stmt, "ssi", $username, $biografia, $user_id);
+        }
+
+        if (mysqli_stmt_execute($stmt)) {
+            mysqli_stmt_close($stmt);
+            return ["exito" => true];
+        }
+
+        mysqli_stmt_close($stmt);
+    }
+
+    return ["exito" => false, "error" => "Error al actualizar el perfil."];
+}
+
+/**
+ * Obtiene la lista de usuarios con un filtro opcional de búsqueda.
+ * @param mysqli $conexion Conexión a la base de datos.
+ * @param string $search Texto de búsqueda opcional.
+ * @return array Lista de usuarios.
+ */
+function obtenerListaUsuarios($conexion, $search = '') {
+    $usuarios = [];
+    $sql = "SELECT u.id, u.username, u.email, u.rol_id, r.nombre AS rol_nombre
+            FROM users u
+            LEFT JOIN roles r ON u.rol_id = r.id";
+
+    // Agregar filtro de búsqueda si se proporciona
+    if (!empty($search)) {
+        $search = $conexion->real_escape_string($search);
+        $sql .= " WHERE username LIKE '%$search%' OR email LIKE '%$search%'";
+    }
+
+    $sql .= " ORDER BY id DESC";
+
+    // Ejecutar la consulta
+    $result = $conexion->query($sql);
+
+    if ($result && $result->num_rows > 0) {
+        while ($row = $result->fetch_assoc()) {
+            $usuarios[] = $row;
+        }
+    }
+
+    return $usuarios;
+}
+?>

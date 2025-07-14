@@ -1,0 +1,109 @@
+<?php
+include_once(__DIR__ . "/../lib/common.php"); // Ruta corregida para incluir common.php
+
+function tiempo_transcurrido($datetime) {
+    $ahora = new DateTime();
+    $pasado = new DateTime($datetime);
+    $intervalo = $ahora->diff($pasado);
+
+    $tiempo = '';
+
+    if ($intervalo->y > 0) {
+        $tiempo .= $intervalo->y . ' año' . ($intervalo->y > 1 ? 's' : '');
+    } elseif ($intervalo->m > 0) {
+        $tiempo .= $intervalo->m . ' mes' . ($intervalo->m > 1 ? 'es' : '');
+    } elseif ($intervalo->d > 0) {
+        $tiempo .= $intervalo->d . ' día' . ($intervalo->d > 1 ? 's' : '');
+    } elseif ($intervalo->h > 0) {
+        $tiempo .= $intervalo->h . ' hora' . ($intervalo->h > 1 ? 's' : '');
+    } elseif ($intervalo->i > 0) {
+        $tiempo .= $intervalo->i . ' minuto' . ($intervalo->i > 1 ? 's' : '');
+    } else {
+        $tiempo .= $intervalo->s . ' segundo' . ($intervalo->s != 1 ? 's' : '');
+    }
+
+    return 'hace ' . $tiempo;
+}
+
+// Obtener el ID del artículo de la URL (asumiendo que se pasa por GET)
+if (isset($_GET["id"]) && is_numeric($_GET["id"])) {
+    $articulo_id_actual = $_GET["id"];
+
+    // Consulta para obtener los comentarios del artículo actual junto con el nombre del usuario
+    $sql = "SELECT c.id, c.usuario_id, c.contenido, c.fecha_creacion, u.username
+            FROM comentarios c
+            INNER JOIN users u ON c.usuario_id = u.id
+            WHERE c.articulo_id = ?
+            ORDER BY c.fecha_creacion ASC";
+
+    $stmt = $conexion->prepare($sql);
+
+    if ($stmt) {
+        $stmt->bind_param("i", $articulo_id_actual);
+        $stmt->execute();
+        $result = $stmt->get_result();
+
+        ?>
+        <section class="mb-3">
+            <div class="card bg-light">
+                <div class="card-body">
+                    <h5 class="card-title mb-4"><?php echo $result->num_rows; ?> comentarios</h5>
+                    <?php
+                    if ($result->num_rows > 0) {
+                        while($row = $result->fetch_assoc()) {
+                            echo '<div class="ms-3 mb-2">';
+                            // Convertir el nombre del usuario en un enlace al perfil
+                            echo '<div class="fw-bold"><a href="' . VIEWS_URL . 'users/profile.php?id=' . urlencode($row["usuario_id"]) . '" class="text-decoration-none">' . htmlspecialchars($row["username"]) . '</a> <span class="text-muted small">' . tiempo_transcurrido($row["fecha_creacion"]) . '</span></div>';
+                            echo htmlspecialchars($row["contenido"]);
+                            echo '<div class="">';
+                            // Verificar si el usuario actual es el autor del comentario
+                            if (isset($_SESSION['user_id']) && $_SESSION['user_id'] == $row["usuario_id"]) {
+                                echo '<a href="'.CONTROLLERS_URL.'comments/edit_comments.php?id=' . urlencode($row["id"]) . '&id_articulo=' . urlencode($articulo_id_actual) . '" class="text-decoration-none small">Editar</a> <span class="mx-1"></span>';
+                                echo '<a href="'.CONTROLLERS_URL.'comments/delete_comments.php?id=' . urlencode($row["id"]) . '&id_articulo=' . urlencode($articulo_id_actual) . '" class="text-decoration-none small">Eliminar</a>';
+                            }
+                            /*
+                            Lo comento de momento, ya que no tengo claro si lo quiero implementar o no. (Requiere tiempo y esfuerzo extra)
+                            echo '<a href="#" class="text-decoration-none small">Responder</a> <span class="mx-1"></span> <a href="#" class="text-decoration-none small">Reportar</a>';
+                            */
+                            echo '</div>';
+                            echo '</div>';
+                        }
+                    } else {
+                        echo "Aún no hay comentarios para este artículo.";
+                    }
+                    ?>
+                </div>
+            </div>
+        </section>
+        <?php
+
+        $stmt->close();
+    } else {
+        echo "<p class='alert alert-danger'>Error al preparar la consulta de comentarios.</p>";
+    }
+} else {
+    echo "<p class='alert alert-danger'>ID de artículo inválido.</p>";
+}
+?>
+
+<section class="mb-5">
+    <div class="card bg-light">
+        <div class="card-body">
+            <?php if (!isset($_SESSION['user_id'])): ?>
+                <h5 class="fw-bolder mb-3">
+                    ¡<a href="<?php echo VIEWS_URL; ?>auth/login.php" class="text-decoration-none">Inicia Sesión</a> para dejar un comentario!
+                </h5>
+            <?php else: ?>
+                <form method="POST" action="<?php echo CONTROLLERS_URL; ?>comments/procesar_comentario.php?id=<?php echo urlencode($_GET['id']); ?>">
+                    <textarea class="form-control" rows="3" name="contenido_comentario" placeholder="¡Únete a la conversación dejando un comentario!"></textarea>
+                    <div class="mt-3">
+                        <button class="btn btn-primary" type="submit">Comentar</button>
+                    </div>
+                </form>
+            <?php endif; ?>
+
+            <div class="d-flex">
+            </div>
+        </div>
+    </div>
+</section>

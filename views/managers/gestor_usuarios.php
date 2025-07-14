@@ -1,0 +1,304 @@
+<?php
+include(__DIR__ . "/../../lib/constants.php");
+include_once(__DIR__ . "/../../lib/common.php");
+include_once(__DIR__ . "/../../lib/user.php");
+include_once(__DIR__ . "/../../lib/helpers.php");
+
+if (!verificarPermiso(1)) {
+    header("Location:" . BASE_URL . "index.php?error=permiso_denegado");
+    exit();
+}
+
+// Obtener la lista de usuarios
+$search = isset($_GET['search']) ? $_GET['search'] : '';
+$usuarios = obtenerListaUsuarios($conexion, $search);
+
+// Obtener la lista de roles
+$roles_disponibles = obtenerRoles($conexion);
+?>
+
+<?php
+$tituloPagina = "Gestor de Usuarios";
+include(__DIR__ . "/../../includes/head.php");
+?>
+
+<body class="d-flex flex-column min-vh-100">
+
+    <div id="loading-overlay">
+        <div class="spinner-border text-primary" role="status">
+            <span class="visually-hidden">Cargando...</span>
+        </div>
+    </div>
+
+    <?php include(__DIR__ . "/../../includes/header.php"); ?>
+    <?php include(__DIR__ . "/../../includes/asideAdmin.php"); ?>
+
+    <div class="col-lg-8">
+        <div class="row mb-5">
+            <h1 class="fw-bolder mb-4">Gestión de Usuarios</h1>
+
+            <?php if (isset($_SESSION['mensaje'])): ?>
+                <div class="alert alert-success" role="alert">
+                    <?php echo htmlspecialchars($_SESSION['mensaje']); ?>
+                    <?php unset($_SESSION['mensaje']); ?>
+                </div>
+            <?php endif; ?>
+
+            <form method="GET" action="">
+                <div class="input-group mb-3">
+                    <input type="text" name="search" id="buscarUsuario" class="form-control" placeholder="Buscar usuario..." value="<?php echo htmlspecialchars($search); ?>">
+                    <button class="btn btn-outline-secondary" type="submit">Buscar</button>
+                </div>
+            </form>
+
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Nombre</th>
+                        <th>Email</th>
+                        <th>Rol</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <?php if (!empty($usuarios)): ?>
+                        <?php foreach ($usuarios as $usuario): ?>
+                            <tr>
+                                <td><?php echo htmlspecialchars($usuario["username"]); ?></td>
+                                <td><?php echo htmlspecialchars($usuario["email"]); ?></td>
+                                <td><?php echo htmlspecialchars($usuario["rol_nombre"] ?? 'no asignado'); ?></td>
+                                <td>
+                                    <div class="dropdown">
+                                        <button class="btn btn-warning dropdown-toggle" type="button" id="dropdownMenuButton<?php echo $usuario['id']; ?>" data-bs-toggle="dropdown" aria-expanded="false">
+                                            Acciones
+                                        </button>
+                                        <ul class="dropdown-menu" aria-labelledby="dropdownMenuButton<?php echo $usuario['id']; ?>">
+                                            <!--<li><a class="dropdown-item" href="#">Editar</a></li>
+                                            <li><a class="dropdown-item" href="#">Eliminar</a></li>-->
+                                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#asignarRolModal<?php echo $usuario['id']; ?>">Asignar Rol</a></li>
+                                            <li><a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#restablecerContraseñaModal<?php echo $usuario['id']; ?>">Restablecer Contraseña</a></li>
+                                            <li>
+                                                <?php if ($usuario['state'] == 'suspendido'): ?>
+                                                    <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#activarCuentaModal<?php echo $usuario['id']; ?>">Activar Cuenta</a>
+                                                <?php else: ?>
+                                                    <a class="dropdown-item" href="#" data-bs-toggle="modal" data-bs-target="#suspenderCuentaModal<?php echo $usuario['id']; ?>">Suspender Cuenta</a>
+                                                <?php endif; ?>
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </td>
+                            </tr>
+
+                            <div class="modal fade" id="activarCuentaModal<?php echo $usuario['id']; ?>" tabindex="-1" aria-labelledby="activarCuentaModalLabel<?php echo $usuario['id']; ?>" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="activarCuentaModalLabel<?php echo $usuario['id']; ?>">Activar Cuenta de <?php echo htmlspecialchars($usuario["username"]); ?></h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <form method="POST" action="<?php echo CONTROLLERS_URL; ?>users/process_activate_account.php">
+                                            <input type="hidden" name="user_id" value="<?php echo htmlspecialchars($usuario['id']); ?>">
+                                            <div class="modal-body">
+                                                <p>¿Estás seguro de que deseas activar esta cuenta?</p>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-success">Activar</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="modal fade" id="suspenderCuentaModal<?php echo $usuario['id']; ?>" tabindex="-1" aria-labelledby="suspenderCuentaModalLabel<?php echo $usuario['id']; ?>" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="suspenderCuentaModalLabel<?php echo $usuario['id']; ?>">Suspender Cuenta de <?php echo htmlspecialchars($usuario["username"]); ?></h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <form method="POST" action="<?php echo CONTROLLERS_URL; ?>users/process_suspend_account.php">
+                                            <input type="hidden" name="user_id" value="<?php echo htmlspecialchars($usuario['id']); ?>">
+                                            <div class="modal-body">
+                                                <p>¿Estás seguro de que deseas suspender esta cuenta?</p>
+                                                <div class="mb-3">
+                                                    <label for="razonSuspension<?php echo $usuario['id']; ?>" class="form-label fw-bold">Razón de la suspensión:</label>
+                                                    <textarea class="form-control" id="razonSuspension<?php echo $usuario['id']; ?>" name="razon_suspension" rows="3" placeholder="Ingrese la razón de la suspensión" required></textarea>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-danger">Suspender</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="modal fade" id="activarCuentaModal<?php echo $usuario['id']; ?>" tabindex="-1" aria-labelledby="activarCuentaModalLabel<?php echo $usuario['id']; ?>" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="activarCuentaModalLabel<?php echo $usuario['id']; ?>">Activar Cuenta de <?php echo htmlspecialchars($usuario["username"]); ?></h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <form method="POST" action="<?php echo CONTROLLERS_URL; ?>users/process_activate_account.php">
+                                            <input type="hidden" name="user_id" value="<?php echo htmlspecialchars($usuario['id']); ?>">
+                                            <div class="modal-body">
+                                                <p>¿Estás seguro de que deseas activar esta cuenta?</p>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-success">Activar</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="modal fade" id="activarCuentaModal<?php echo $usuario['id']; ?>" tabindex="-1" aria-labelledby="activarCuentaModalLabel<?php echo $usuario['id']; ?>" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="activarCuentaModalLabel<?php echo $usuario['id']; ?>">Activar Cuenta de <?php echo htmlspecialchars($usuario["username"]); ?></h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <form method="POST" action="<?php echo CONTROLLERS_URL; ?>users/process_activate_account.php">
+                                            <input type="hidden" name="user_id" value="<?php echo htmlspecialchars($usuario['id']); ?>">
+                                            <div class="modal-body">
+                                                <p>¿Estás seguro de que deseas activar esta cuenta?</p>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-success">Activar</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="modal fade" id="asignarRolModal<?php echo $usuario['id']; ?>" tabindex="-1" aria-labelledby="asignarRolModalLabel<?php echo $usuario['id']; ?>" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="asignarRolModalLabel<?php echo $usuario['id']; ?>">Asignar Rol a <?php echo htmlspecialchars($usuario["username"]); ?></h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <div class="modal-body">
+                                            <p>¿Estás seguro de que deseas asignar un nuevo rol a este usuario?</p>
+                                            <form method="POST" action="<?php echo CONTROLLERS_URL; ?>roles/procesar_roles.php">
+                                                <input type="hidden" name="user_id" value="<?php echo htmlspecialchars($usuario['id']); ?>">
+                                                <label for="nuevoRol<?php echo $usuario['id']; ?>" class="fw-bold">Nuevo Rol.</label>
+                                                <select class="form-select" id="nuevoRol<?php echo $usuario['id']; ?>" name="rol_id">
+                                                    <option value="" disabled selected>Seleccionar rol</option>
+                                                    <option value="0">Quitar Rol</option>
+                                                    <?php if ($roles_disponibles): ?>
+                                                        <?php foreach ($roles_disponibles as $rol): ?>
+                                                            <option value="<?php echo htmlspecialchars($rol['id']); ?>"><?php echo htmlspecialchars($rol['nombre']); ?></option>
+                                                        <?php endforeach; ?>
+                                                    <?php else: ?>
+                                                        <option value="" disabled>No se encontraron roles</option>
+                                                    <?php endif; ?>
+                                                </select>
+                                                <div class="modal-footer mt-3">
+                                                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                    <button type="submit" class="btn btn-primary">Guardar</button>
+                                                </div>
+                                            </form>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="modal fade" id="restablecerContraseñaModal<?php echo $usuario['id']; ?>" tabindex="-1" aria-labelledby="restablecerContraseñaModalLabel<?php echo $usuario['id']; ?>" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="restablecerContraseñaModalLabel<?php echo $usuario['id']; ?>">Restablecer Contraseña de <?php echo htmlspecialchars($usuario["username"]); ?></h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <form method="POST" action="<?php echo CONTROLLERS_URL; ?>users/process_reset_password.php">
+                                            <input type="hidden" name="user_id" value="<?php echo htmlspecialchars($usuario['id']); ?>">
+                                            <div class="modal-body">
+                                                <p>¿Estás seguro de que deseas restablecer la contraseña de este usuario?</p>
+                                                <div class="mb-3">
+                                                    <label for="nuevaContraseña<?php echo $usuario['id']; ?>" class="form-label fw-bold">Nueva Contraseña:</label>
+                                                    <input type="password" class="form-control" id="nuevaContraseña<?php echo $usuario['id']; ?>" name="nueva_contraseña" placeholder="Ingrese nueva contraseña" required>
+                                                </div>
+                                                <div class="mb-3">
+                                                    <label for="confirmarContraseña<?php echo $usuario['id']; ?>" class="form-label fw-bold">Confirmar Contraseña:</label>
+                                                    <input type="password" class="form-control" id="confirmarContraseña<?php echo $usuario['id']; ?>" name="confirmar_contraseña" placeholder="Confirme nueva contraseña" required>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-primary">Guardar</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="modal fade" id="suspenderCuentaModal<?php echo $usuario['id']; ?>" tabindex="-1" aria-labelledby="suspenderCuentaModalLabel<?php echo $usuario['id']; ?>" aria-hidden="true">
+                                <div class="modal-dialog">
+                                    <div class="modal-content">
+                                        <div class="modal-header">
+                                            <h5 class="modal-title" id="suspenderCuentaModalLabel<?php echo $usuario['id']; ?>">Suspender Cuenta de <?php echo htmlspecialchars($usuario["username"]); ?></h5>
+                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                                        </div>
+                                        <form method="POST" action="<?php echo CONTROLLERS_URL; ?>users/process_suspend_account.php">
+                                            <input type="hidden" name="user_id" value="<?php echo htmlspecialchars($usuario['id']); ?>">
+                                            <div class="modal-body">
+                                                <p>¿Estás seguro de que deseas suspender esta cuenta?</p>
+                                                <div class="mb-3">
+                                                    <label for="razonSuspension<?php echo $usuario['id']; ?>" class="form-label fw-bold">Razón de la suspensión:</label>
+                                                    <textarea class="form-control" id="razonSuspension<?php echo $usuario['id']; ?>" name="razon_suspension" rows="3" placeholder="Ingrese la razón de la suspensión" required></textarea>
+                                                </div>
+                                            </div>
+                                            <div class="modal-footer">
+                                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancelar</button>
+                                                <button type="submit" class="btn btn-danger">Suspender</button>
+                                            </div>
+                                        </form>
+                                    </div>
+                                </div>
+                            </div>
+
+                        <?php endforeach; ?>
+                    <?php else: ?>
+                        <tr><td colspan="5">No se encontraron usuarios</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+</div>
+
+    <?php include(__DIR__ . "/../../includes/footer.php"); ?>
+    <script src="<?php echo __DIR__ . '/../../js/scripts-admin.js'; ?>"></script>
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            const loadingOverlay = document.getElementById("loading-overlay");
+
+            // Mostrar el overlay al cargar la página
+            loadingOverlay.classList.add("show");
+
+            // Ocultar el overlay después de que la página haya cargado completamente
+            window.addEventListener("load", function () {
+                loadingOverlay.classList.remove("show");
+            });
+        });
+
+        // Función para filtrar usuarios en la tabla
+        document.getElementById('buscarUsuario').addEventListener('keyup', function() {
+            let filtro = this.value.toLowerCase();
+            let filas = document.querySelectorAll('table tbody tr');
+            filas.forEach(fila => {
+                let textoFila = fila.textContent.toLowerCase();
+                fila.style.display = textoFila.includes(filtro) ? '' : 'none';
+            });
+        });
+    </script>
+</body>
+</html>
