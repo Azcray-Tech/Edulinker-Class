@@ -21,13 +21,43 @@ if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
 $categoria_id = $_GET['id'];
 
 // Verificar si la categoría tiene artículos asociados antes de eliminar
-$sql_verificar_articulos = "SELECT COUNT(*) AS total FROM articles WHERE category = ?";
-$stmt_verificar_articulos = $conexion->prepare($sql_verificar_articulos);
-$stmt_verificar_articulos->bind_param("i", $categoria_id);
-$stmt_verificar_articulos->execute();
-$result_verificar_articulos = $stmt_verificar_articulos->get_result();
-$total_articulos = $result_verificar_articulos->fetch_assoc()['total'];
-$stmt_verificar_articulos->close();
+// Obtener el nombre de la categoría (necesario tanto para el servicio como para el fallback)
+$stmt_cat = $conexion->prepare("SELECT nombre FROM category WHERE id = ?");
+$stmt_cat->bind_param("i", $categoria_id);
+$stmt_cat->execute();
+$res_cat = $stmt_cat->get_result();
+$cat_row = $res_cat->fetch_assoc();
+$stmt_cat->close();
+
+$category_name = $cat_row['nombre'] ?? '';
+$total_articulos = 0;
+
+// Intentar usar el servicio de artículos para contar la cantidad por categoría (compatibilidad gradual)
+try {
+    if (!class_exists(\App\Article\ArticleService::class)) {
+        if (file_exists(__DIR__ . '/../../vendor/autoload.php')) {
+            require_once __DIR__ . '/../../vendor/autoload.php';
+        }
+    }
+    if (class_exists(\App\Article\ArticleService::class) && $category_name !== '') {
+        $service = new \App\Article\ArticleService();
+        $total_articulos = $service->countArticlesByCategory($category_name);
+    }
+} catch (\Throwable $e) {
+    error_log('ArticleService countArticlesByCategory error: ' . $e->getMessage());
+}
+
+// Fallback legacy si el servicio no devolvió el total
+if ($total_articulos === 0) {
+    $sql_verificar_articulos = "SELECT COUNT(*) AS total FROM articles WHERE category = ?";
+    $stmt_verificar_articulos = $conexion->prepare($sql_verificar_articulos);
+    // La columna 'category' almacena el nombre de la categoría en este esquema
+    $stmt_verificar_articulos->bind_param("s", $category_name);
+    $stmt_verificar_articulos->execute();
+    $result_verificar_articulos = $stmt_verificar_articulos->get_result();
+    $total_articulos = $result_verificar_articulos->fetch_assoc()['total'];
+    $stmt_verificar_articulos->close();
+}
 
 if ($total_articulos > 0) {
     $_SESSION['mensaje'] = "No se puede eliminar la categoría porque tiene " . $total_articulos . " artículos asociados.";

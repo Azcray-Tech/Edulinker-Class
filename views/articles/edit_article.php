@@ -17,38 +17,63 @@ if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
 
 $article_id = $_GET['id'];
 
-// Obtener la información del artículo a editar, incluyendo el ID de la categoría
-$sql_articulo = "SELECT id, title, article, image, category FROM articles WHERE id = ?";
-$stmt_articulo = mysqli_prepare($conexion, $sql_articulo);
-mysqli_stmt_bind_param($stmt_articulo, "i", $article_id);
-mysqli_stmt_execute($stmt_articulo);
-$result_articulo = mysqli_stmt_get_result($stmt_articulo);
-
-if (!$result_articulo || mysqli_num_rows($result_articulo) == 0) {
-    // Si no se encuentra el artículo, redirigir o mostrar un error
-    header("Location: index.php");
-    exit();
+// Intentar obtener la información del artículo usando ArticleService (compatibilidad gradual)
+$article_data = null;
+try {
+    if (!class_exists('\App\Article\ArticleService')) {
+        if (file_exists(__DIR__ . "/../../vendor/autoload.php")) {
+            require_once __DIR__ . "/../../vendor/autoload.php";
+        }
+    }
+    if (class_exists('\App\Article\ArticleService')) {
+        $service = new \App\Article\ArticleService();
+        $article_data = $service->getArticleById($article_id);
+    }
+} catch (\Throwable $e) {
+    error_log('ArticleService getArticleById error (edit): ' . $e->getMessage());
 }
 
-$article_data = mysqli_fetch_assoc($result_articulo);
+// Fallback legacy si no se obtuvo con el servicio
+if (!$article_data) {
+    $sql_articulo = "SELECT id, title, article, image, category FROM articles WHERE id = ?";
+    $stmt_articulo = mysqli_prepare($conexion, $sql_articulo);
+    mysqli_stmt_bind_param($stmt_articulo, "i", $article_id);
+    mysqli_stmt_execute($stmt_articulo);
+    $result_articulo = mysqli_stmt_get_result($stmt_articulo);
+
+    if (!$result_articulo || mysqli_num_rows($result_articulo) == 0) {
+        header("Location: index.php");
+        exit();
+    }
+
+    $article_data = mysqli_fetch_assoc($result_articulo);
+    mysqli_stmt_close($stmt_articulo);
+}
+
 $article_title = htmlspecialchars($article_data['title']);
 $article_content = htmlspecialchars($article_data['article']);
 $article_image = htmlspecialchars($article_data['image']);
-$article_category_id = $article_data['category']; // Asegúrate de que esto sea el ID
+$article_category_id = $article_data['category'];
 
-mysqli_stmt_close($stmt_articulo);
-
-// Obtener la lista de categorías para el select
-$sql_categorias = "SELECT id, nombre FROM category";
-$result_categorias = mysqli_query($conexion, $sql_categorias);
+// Obtener la lista de categorías para el select (usar helper legacy si está disponible)
 $categories = [];
-if ($result_categorias) {
-    while ($row_categoria = mysqli_fetch_assoc($result_categorias)) {
+if (function_exists('obtenerCategorias')) {
+    $cats = obtenerCategorias($conexion);
+    foreach ($cats as $row_categoria) {
         $categories[$row_categoria['id']] = htmlspecialchars($row_categoria['nombre']);
     }
-    mysqli_free_result($result_categorias);
 } else {
-    error_log("Error en la consulta de nombres de categorías: " . mysqli_error($conexion), 0);
+    // Fallback a consulta directa si no existe la función
+    $sql_categorias = "SELECT id, nombre FROM category";
+    $result_categorias = mysqli_query($conexion, $sql_categorias);
+    if ($result_categorias) {
+        while ($row_categoria = mysqli_fetch_assoc($result_categorias)) {
+            $categories[$row_categoria['id']] = htmlspecialchars($row_categoria['nombre']);
+        }
+        mysqli_free_result($result_categorias);
+    } else {
+        error_log("Error en la consulta de nombres de categorías: " . mysqli_error($conexion), 0);
+    }
 }
 
 ?>

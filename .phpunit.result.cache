@@ -1,0 +1,1 @@
+C:37:"PHPUnit\Runner\DefaultTestResultCache":174:{a:2:{s:7:"defects";a:0:{}s:5:"times";a:2:{s:47:"ArticleServiceTest::testCountArticlesReturnsInt";d:0.01;s:52:"ArticleServiceTest::testGetArticlesArrayReturnsArray";d:0.003;}}}

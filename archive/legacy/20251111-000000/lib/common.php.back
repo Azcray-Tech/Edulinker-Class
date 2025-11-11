@@ -50,38 +50,16 @@ function obtenerArticulo($conexion, $id_post) {
             mysqli_stmt_close($stmt);
             return $articulo;
         } else {
-            
             error_log("Error en la consulta obtenerArticulo: " . mysqli_error($conexion));
             mysqli_stmt_close($stmt);
             return null;
         }
     } else {
-        
         error_log("Error al preparar la consulta obtenerArticulo: " . mysqli_error($conexion));
         return null;
     }
 }
 
-/*function obtenerCategorias($conexion) {
-    $sql = "SELECT nombre FROM category ORDER BY nombre ASC";
-    $result = mysqli_query($conexion, $sql);
-
-    if ($result) {
-        $categorias = array();
-        while ($row = mysqli_fetch_assoc($result)) {
-            $categorias[] = $row['nombre'];
-        }
-        mysqli_free_result($result); // Liberar el resultado
-        return $categorias;
-    } else {
-        // Manejar errores de consulta
-        error_log("Error en la consulta obtenerCategorias: " . mysqli_error($conexion));
-        return null;
-    }
-}
-    */
-
-// Función para generar la paginación
 function generarPaginacion($paginaActual, $totalPaginas, $urlBase) {
     $paginacion = '<nav aria-label="Paginación"><ul class="pagination justify-content-center">';
 

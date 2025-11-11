@@ -13,6 +13,9 @@ include(__DIR__ . "/../../lib/common.php");
 include(__DIR__ . "/../../lib/articles.php");
 include(__DIR__ . "/../../lib/notifications.php");
 
+// Asegurar que $user_id existe y proviene de la sesión si el usuario está logueado.
+$user_id = isset($_SESSION['user_id']) ? $_SESSION['user_id'] : null;
+
 if (isset($_GET['notification_id']) && is_numeric($_GET['notification_id']) && isset($_SESSION['user_id'])) {
     $notification_id = $_GET['notification_id'];
     $user_id_logueado = $_SESSION['user_id'];
@@ -35,7 +38,21 @@ if (!$id_post) {
     exit;
 }
 
-$articulo = obtenerArticulo($conexion, $id_post);
+// Intentar obtener el artículo usando el nuevo servicio (compatibilidad gradual)
+$articulo = null;
+try {
+    if (!class_exists('\App\Article\ArticleService')) {
+        if (file_exists(__DIR__ . "/../../vendor/autoload.php")) {
+            require_once __DIR__ . "/../../vendor/autoload.php";
+        }
+    }
+    $articleService = new \App\Article\ArticleService();
+    $articulo = $articleService->getArticleById($id_post);
+} catch (\Throwable $e) {
+    error_log('ArticleService getArticleById error: ' . $e->getMessage());
+    // Fallback al método legacy
+    $articulo = obtenerArticulo($conexion, $id_post);
+}
 
 if ($articulo) {
     //mostrarHeader(htmlspecialchars($articulo['title']));

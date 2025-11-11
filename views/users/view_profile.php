@@ -41,35 +41,49 @@ $offset = ($paginaActual - 1) * $articulosPorPagina;
 $articulos_usuario = [];
 $totalArticulos = 0; // Inicializar el total de artículos
 if (in_array($rolNombre, $rolesPermitidos)) {
-    // Obtener el total de artículos del usuario
-    $sql_total_articulos = "SELECT COUNT(id) AS total FROM articles WHERE user = ?";
-    $stmt_total_articulos = mysqli_prepare($conexion, $sql_total_articulos);
-    if ($stmt_total_articulos) {
-        mysqli_stmt_bind_param($stmt_total_articulos, "i", $user_id);
-        mysqli_stmt_execute($stmt_total_articulos);
-        $result_total_articulos = mysqli_stmt_get_result($stmt_total_articulos);
-        $row_total_articulos = mysqli_fetch_assoc($result_total_articulos);
-        $totalArticulos = $row_total_articulos['total'];
-        mysqli_stmt_close($stmt_total_articulos);
-    } else {
-        echo "Error al obtener el total de artículos del usuario.";
+    try {
+        if (!class_exists('\App\Article\ArticleService')) {
+            if (file_exists(__DIR__ . '/../../vendor/autoload.php')) {
+                require_once __DIR__ . '/../../vendor/autoload.php';
+            }
+        }
+        if (class_exists('\App\Article\ArticleService')) {
+            $service = new \App\Article\ArticleService();
+            $totalArticulos = $service->countArticlesByUser($user_id);
+            $articulos_usuario = $service->getArticlesByUserArray($user_id, $articulosPorPagina, $offset);
+        }
+    } catch (\Throwable $e) {
+        error_log('ArticleService user articles error: ' . $e->getMessage());
     }
 
-    $sql_articulos = "SELECT id, title, article, image FROM articles WHERE user = ? LIMIT ?, ?";
-    $stmt_articulos = mysqli_prepare($conexion, $sql_articulos);
-
-    if ($stmt_articulos) {
-        mysqli_stmt_bind_param($stmt_articulos, "iii", $user_id, $offset, $articulosPorPagina);
-        mysqli_stmt_execute($stmt_articulos);
-        $result_articulos = mysqli_stmt_get_result($stmt_articulos);
-
-        while ($row_articulo = mysqli_fetch_assoc($result_articulos)) {
-            $articulos_usuario[] = $row_articulo;
+    // Fallback legacy si el servicio no devuelve nada
+    if ($totalArticulos == 0 && empty($articulos_usuario)) {
+        // Obtener el total de artículos del usuario
+        $sql_total_articulos = "SELECT COUNT(id) AS total FROM articles WHERE user = ?";
+        $stmt_total_articulos = mysqli_prepare($conexion, $sql_total_articulos);
+        if ($stmt_total_articulos) {
+            mysqli_stmt_bind_param($stmt_total_articulos, "i", $user_id);
+            mysqli_stmt_execute($stmt_total_articulos);
+            $result_total_articulos = mysqli_stmt_get_result($stmt_total_articulos);
+            $row_total_articulos = mysqli_fetch_assoc($result_total_articulos);
+            $totalArticulos = $row_total_articulos['total'];
+            mysqli_stmt_close($stmt_total_articulos);
         }
 
-        mysqli_stmt_close($stmt_articulos);
-    } else {
-        echo "Error al obtener los artículos del usuario.";
+        $sql_articulos = "SELECT id, title, article, image FROM articles WHERE user = ? LIMIT ?, ?";
+        $stmt_articulos = mysqli_prepare($conexion, $sql_articulos);
+
+        if ($stmt_articulos) {
+            mysqli_stmt_bind_param($stmt_articulos, "iii", $user_id, $offset, $articulosPorPagina);
+            mysqli_stmt_execute($stmt_articulos);
+            $result_articulos = mysqli_stmt_get_result($stmt_articulos);
+
+            while ($row_articulo = mysqli_fetch_assoc($result_articulos)) {
+                $articulos_usuario[] = $row_articulo;
+            }
+
+            mysqli_stmt_close($stmt_articulos);
+        }
     }
 }
 

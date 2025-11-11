@@ -30,23 +30,44 @@ if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
 $article_id = $_GET['id'];
 $user_id = $_SESSION["user_id"]; // Obtener el ID del usuario logueado
 
-// Obtener la información del artículo para mostrar la confirmación
-$sql_articulo = "SELECT title FROM articles WHERE id = ?";
-$stmt_articulo = mysqli_prepare($conexion, $sql_articulo);
-mysqli_stmt_bind_param($stmt_articulo, "i", $article_id);
-mysqli_stmt_execute($stmt_articulo);
-$result_articulo = mysqli_stmt_get_result($stmt_articulo);
-
-if (!$result_articulo || mysqli_num_rows($result_articulo) == 0) {
-    // Si no se encuentra el artículo, redirigir
-    header("Location:" . VIEWS_URL . "users/view_profile.php");
-    exit();
+// Intentar obtener la información del artículo usando ArticleService
+$article_title = null;
+try {
+    if (!class_exists('\App\Article\ArticleService')) {
+        if (file_exists(__DIR__ . '/../../vendor/autoload.php')) {
+            require_once __DIR__ . '/../../vendor/autoload.php';
+        }
+    }
+    if (class_exists('\App\Article\ArticleService')) {
+        $service = new \App\Article\ArticleService();
+        $article = $service->getArticleById($article_id);
+        if ($article) {
+            $article_title = htmlspecialchars($article['title']);
+        }
+    }
+} catch (\Throwable $e) {
+    error_log('ArticleService getArticleById error (delete): ' . $e->getMessage());
 }
 
-$article_data = mysqli_fetch_assoc($result_articulo);
-$article_title = htmlspecialchars($article_data['title']);
+// Fallback legacy si no se obtuvo con el servicio
+if (!$article_title) {
+    $sql_articulo = "SELECT title FROM articles WHERE id = ?";
+    $stmt_articulo = mysqli_prepare($conexion, $sql_articulo);
+    mysqli_stmt_bind_param($stmt_articulo, "i", $article_id);
+    mysqli_stmt_execute($stmt_articulo);
+    $result_articulo = mysqli_stmt_get_result($stmt_articulo);
 
-mysqli_stmt_close($stmt_articulo);
+    if (!$result_articulo || mysqli_num_rows($result_articulo) == 0) {
+        // Si no se encuentra el artículo, redirigir
+        header("Location:" . VIEWS_URL . "users/view_profile.php");
+        exit();
+    }
+
+    $article_data = mysqli_fetch_assoc($result_articulo);
+    $article_title = htmlspecialchars($article_data['title']);
+
+    mysqli_stmt_close($stmt_articulo);
+}
 
 // Procesar la confirmación de eliminación
 if (isset($_POST['confirm_delete'])) {
@@ -55,26 +76,39 @@ if (isset($_POST['confirm_delete'])) {
         die("Error: Petición no válida.");
     }
 
-    // Eliminar el artículo de la base de datos
-    $sql_delete = "DELETE FROM articles WHERE id = ?";
-    $stmt_delete = mysqli_prepare($conexion, $sql_delete);
-    mysqli_stmt_bind_param($stmt_delete, "i", $article_id);
-
-    if (mysqli_stmt_execute($stmt_delete)) {
-        // Artículo eliminado con éxito, redirigir según el rol
-        if (verificarPermiso(1)) { // Si es administrador
-            header("Location:" . VIEWS_URL . "managers/gestor_articulos.php?delete_success=1");
-            exit();
-        } else { // Si es profesor (ya verificamos que tiene permiso)
-            header("Location:" . VIEWS_URL . "users/view_profile.php?delete_success=1");
-            exit();
+    try {
+        if (!class_exists('\App\Article\ArticleService')) {
+            if (file_exists(__DIR__ . '/../../vendor/autoload.php')) {
+                require_once __DIR__ . '/../../vendor/autoload.php';
+            }
         }
-    } else {
-        // Error al eliminar el artículo
-        echo "Error al eliminar el artículo: " . mysqli_error($conexion);
-    }
 
-    mysqli_stmt_close($stmt_delete);
+        if (class_exists('\App\Article\ArticleService')) {
+            $service = new \App\Article\ArticleService();
+            $ok = $service->deleteArticle($article_id, $user_id);
+        } else {
+            $sql_delete = "DELETE FROM articles WHERE id = ?";
+            $stmt_delete = mysqli_prepare($conexion, $sql_delete);
+            mysqli_stmt_bind_param($stmt_delete, "i", $article_id);
+            $ok = mysqli_stmt_execute($stmt_delete);
+            mysqli_stmt_close($stmt_delete);
+        }
+
+        if ($ok) {
+            if (verificarPermiso(1)) { // Si es administrador
+                header("Location:" . VIEWS_URL . "managers/gestor_articulos.php?delete_success=1");
+                exit();
+            } else { // Si es profesor (ya verificamos que tiene permiso)
+                header("Location:" . VIEWS_URL . "users/view_profile.php?delete_success=1");
+                exit();
+            }
+        } else {
+            echo "Error al eliminar el artículo.";
+        }
+    } catch (\Throwable $e) {
+        error_log('ArticleService delete error: ' . $e->getMessage());
+        echo "Error al eliminar el artículo: " . $e->getMessage();
+    }
 }
 
 // Generar un token CSRF para seguridad

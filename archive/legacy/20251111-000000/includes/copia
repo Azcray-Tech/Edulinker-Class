@@ -52,19 +52,13 @@ if (isset($_GET["id"]) && is_numeric($_GET["id"])) {
                     if ($result->num_rows > 0) {
                         while($row = $result->fetch_assoc()) {
                             echo '<div class="ms-3 mb-2">';
-                            // Convertir el nombre del usuario en un enlace al perfil
                             echo '<div class="fw-bold"><a href="' . VIEWS_URL . 'users/profile.php?id=' . urlencode($row["usuario_id"]) . '" class="text-decoration-none">' . htmlspecialchars($row["username"]) . '</a> <span class="text-muted small">' . tiempo_transcurrido($row["fecha_creacion"]) . '</span></div>';
                             echo htmlspecialchars($row["contenido"]);
                             echo '<div class="">';
-                            // Verificar si el usuario actual es el autor del comentario
                             if (isset($_SESSION['user_id']) && $_SESSION['user_id'] == $row["usuario_id"]) {
                                 echo '<a href="'.CONTROLLERS_URL.'comments/edit_comments.php?id=' . urlencode($row["id"]) . '&id_articulo=' . urlencode($articulo_id_actual) . '" class="text-decoration-none small">Editar</a> <span class="mx-1"></span>';
                                 echo '<a href="'.CONTROLLERS_URL.'comments/delete_comments.php?id=' . urlencode($row["id"]) . '&id_articulo=' . urlencode($articulo_id_actual) . '" class="text-decoration-none small">Eliminar</a>';
                             }
-                            /*
-                            Lo comento de momento, ya que no tengo claro si lo quiero implementar o no. (Requiere tiempo y esfuerzo extra)
-                            echo '<a href="#" class="text-decoration-none small">Responder</a> <span class="mx-1"></span> <a href="#" class="text-decoration-none small">Reportar</a>';
-                            */
                             echo '</div>';
                             echo '</div>';
                         }
