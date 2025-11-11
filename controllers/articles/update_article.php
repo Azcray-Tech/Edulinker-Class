@@ -36,21 +36,42 @@ if (isset($_POST['update_article'])) {
 
     mysqli_stmt_close($stmt_nombre_categoria);
 
-    // Verificar si el artículo pertenece al usuario actual (esta lógica se mantiene)
-    $sql_articulo = "SELECT user FROM articles WHERE id = ?";
-    $stmt_articulo = mysqli_prepare($conexion, $sql_articulo);
-    mysqli_stmt_bind_param($stmt_articulo, "i", $article_id);
-    mysqli_stmt_execute($stmt_articulo);
-    $result_articulo = mysqli_stmt_get_result($stmt_articulo);
-
-    if ($row_articulo = mysqli_fetch_assoc($result_articulo)) {
-        $article_user_id = $row_articulo['user'];
-    } else {
-        echo "Artículo no encontrado.";
-        exit();
+    // Verificar si el artículo pertenece al usuario actual (intentar usar ArticleService)
+    $article_user_id = null;
+    try {
+        if (!class_exists('\App\Article\ArticleService')) {
+            if (file_exists(__DIR__ . '/../../vendor/autoload.php')) {
+                require_once __DIR__ . '/../../vendor/autoload.php';
+            }
+        }
+        if (class_exists('\App\Article\ArticleService')) {
+            $service = new \App\Article\ArticleService();
+            $art = $service->getArticleById($article_id);
+            if ($art && isset($art['user'])) {
+                $article_user_id = $art['user'];
+            }
+        }
+    } catch (\Throwable $e) {
+        error_log('ArticleService getArticleById error (update): ' . $e->getMessage());
     }
 
-    mysqli_stmt_close($stmt_articulo);
+    // Fallback legacy si no se obtuvo con el servicio
+    if ($article_user_id === null) {
+        $sql_articulo = "SELECT user FROM articles WHERE id = ?";
+        $stmt_articulo = mysqli_prepare($conexion, $sql_articulo);
+        mysqli_stmt_bind_param($stmt_articulo, "i", $article_id);
+        mysqli_stmt_execute($stmt_articulo);
+        $result_articulo = mysqli_stmt_get_result($stmt_articulo);
+
+        if ($row_articulo = mysqli_fetch_assoc($result_articulo)) {
+            $article_user_id = $row_articulo['user'];
+        } else {
+            echo "Artículo no encontrado.";
+            exit();
+        }
+
+        mysqli_stmt_close($stmt_articulo);
+    }
 
     if ($article_user_id != $user_id) {
         echo "No tienes permiso para editar este artículo.";
@@ -82,30 +103,42 @@ if (isset($_POST['update_article'])) {
             exit();
         }
     }
+    // Usar ArticleService si está disponible, con fallback a la consulta legacy
+    try {
+        if (!class_exists('\App\Article\ArticleService')) {
+            if (file_exists(__DIR__ . '/../../vendor/autoload.php')) {
+                require_once __DIR__ . '/../../vendor/autoload.php';
+            }
+        }
 
-    // Preparar la consulta para actualizar el artículo
-    if ($image !== null) {
-        // Si se subió una nueva imagen, actualizar el campo 'image'
-        $sql_update = "UPDATE articles SET title = ?, article = ?, category = ?, image = ? WHERE id = ?";
-        $stmt_update = mysqli_prepare($conexion, $sql_update);
-        mysqli_stmt_bind_param($stmt_update, "ssssi", $title, $article_content, $category_name, $image, $article_id);
-    } else {
-        // Si no se subió una nueva imagen, no actualizar el campo 'image'
-        $sql_update = "UPDATE articles SET title = ?, article = ?, category = ? WHERE id = ?";
-        $stmt_update = mysqli_prepare($conexion, $sql_update);
-        mysqli_stmt_bind_param($stmt_update, "sssi", $title, $article_content, $category_name, $article_id);
+        if (class_exists('\App\Article\ArticleService')) {
+            $service = new \App\Article\ArticleService();
+            $ok = $service->updateArticle($article_id, $title, $article_content, $image, $category_name);
+        } else {
+            // Fallback legacy
+            if ($image !== null) {
+                $sql_update = "UPDATE articles SET title = ?, article = ?, category = ?, image = ? WHERE id = ?";
+                $stmt_update = mysqli_prepare($conexion, $sql_update);
+                mysqli_stmt_bind_param($stmt_update, "ssssi", $title, $article_content, $category_name, $image, $article_id);
+            } else {
+                $sql_update = "UPDATE articles SET title = ?, article = ?, category = ? WHERE id = ?";
+                $stmt_update = mysqli_prepare($conexion, $sql_update);
+                mysqli_stmt_bind_param($stmt_update, "sssi", $title, $article_content, $category_name, $article_id);
+            }
+            $ok = mysqli_stmt_execute($stmt_update);
+            mysqli_stmt_close($stmt_update);
+        }
+
+        if ($ok) {
+            header("Location: " . VIEWS_URL . "articles/articles.php?id=" . $article_id);
+            exit();
+        } else {
+            echo "Error al actualizar el artículo.";
+        }
+    } catch (\Throwable $e) {
+        error_log('ArticleService update error: ' . $e->getMessage());
+        echo "Error al actualizar el artículo: " . $e->getMessage();
     }
-
-    if (mysqli_stmt_execute($stmt_update)) {
-        // Éxito al actualizar el artículo
-        header("Location: " . VIEWS_URL . "articles/articles.php?id=" . $article_id); // Redirigir a la página del artículo
-        exit();
-    } else {
-        // Error al actualizar el artículo
-        echo "Error al actualizar el artículo: " . mysqli_error($conexion);
-    }
-
-    mysqli_stmt_close($stmt_update);
 } else {
     // Si no se envió el formulario correctamente
     header("Location: " . VIEWS_URL . "articles/edit_article.php?id=" . $_POST['article_id']); // Redirigir de vuelta al formulario

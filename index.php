@@ -1,4 +1,9 @@
 <?php
+// Cargar autoload de Composer si existe (permite usar clases nuevas junto al código legacy)
+if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+    require_once __DIR__ . '/vendor/autoload.php';
+}
+
 include_once(__DIR__ . "/lib/constants.php");
 include_once(__DIR__ . "/lib/common.php");
 include_once(__DIR__ . "/lib/articles.php");
@@ -12,18 +17,52 @@ $paginaActual = isset($_GET['pagina']) && is_numeric($_GET['pagina']) ? (int)$_G
 $offset = ($paginaActual - 1) * $articulosPorPagina;
 
 // Obtener el total de artículos y calcular el número total de páginas
-$totalArticulos = contarArticulos($conexion);
+try {
+    if (!class_exists('\App\Article\ArticleRepository')) {
+        // Si Composer autoload no fue cargado por alguna razón, intentar cargarlo manualmente
+        if (file_exists(__DIR__ . '/vendor/autoload.php')) {
+            require_once __DIR__ . '/vendor/autoload.php';
+        }
+    }
+    $articleRepoForCount = new \App\Article\ArticleRepository();
+    $totalArticulos = $articleRepoForCount->countArticles();
+} catch (\Throwable $e) {
+    error_log('ArticleRepository count error: ' . $e->getMessage());
+    // Fallback al método legacy
+    $totalArticulos = isset($conexion) ? contarArticulos($conexion) : 0;
+}
+
 $totalPaginas = ceil($totalArticulos / $articulosPorPagina);
 
-$result = obtenerArticulos($conexion, $articulosPorPagina, $offset);
+$result = null;
+// Usar el repositorio nuevo para obtener artículos (migración gradual). Si falla, usar el método legacy.
+try {
+    $articleRepo = new \App\Article\ArticleRepository();
+    $result = $articleRepo->getArticles($articulosPorPagina, $offset);
+} catch (\Throwable $e) {
+    error_log('ArticleRepository error: ' . $e->getMessage());
+    // Fallback al código legacy
+    if (isset($conexion)) {
+        $result = obtenerArticulos($conexion, $articulosPorPagina, $offset);
+    }
+}
 
 $tituloPagina = "Artículos Recientes";
 include_once(__DIR__ . "/includes/head.php");
 
 // Buscar artículos si se proporciona una consulta de búsqueda
 if (isset($_GET['search'])) {
-    $search = $_GET['search'];
-    $resultados = buscarArticulos($conexion, $search);
+    $search = trim($_GET['search']);
+    $resultados = [];
+    try {
+        $articleServiceForSearch = new \App\Article\ArticleService();
+        // Limitar a 100 resultados para la búsqueda en la página principal
+        $resultados = $articleServiceForSearch->getArticlesArray(100, 0, $search);
+    } catch (\Throwable $e) {
+        error_log('ArticleService search error: ' . $e->getMessage());
+        // Fallback al método legacy
+        $resultados = buscarArticulos($conexion, $search);
+    }
 } else {
     $resultados = [];
 }

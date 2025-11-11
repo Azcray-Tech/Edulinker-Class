@@ -18,8 +18,21 @@ if (!$id_category) {
     exit;
 }
 
-// Obtener los artículos de la categoría
-$articulos = obtenerArticulosPorCategoria($conexion, $id_category);
+// Obtener los artículos de la categoría (usar ArticleService cuando sea posible)
+$articulos = [];
+try {
+    if (!class_exists('\App\Article\ArticleService')) {
+        if (file_exists(__DIR__ . "/../../vendor/autoload.php")) {
+            require_once __DIR__ . "/../../vendor/autoload.php";
+        }
+    }
+    $articleService = new \App\Article\ArticleService();
+    $articulos = $articleService->getArticlesByCategoryArray($id_category, null, 0);
+} catch (\Throwable $e) {
+    error_log('ArticleService getArticlesByCategoryArray error: ' . $e->getMessage());
+    // Fallback al método legacy
+    $articulos = obtenerArticulosPorCategoria($conexion, $id_category);
+}
 
 // Definir el título de la página de forma segura
 $tituloPagina = "Artículos de ";

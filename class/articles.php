@@ -108,6 +108,22 @@ class Articles
      */
     public function insertarArticulo($conexion, $titulo, $contenido, $imagen, $categoria, $usuario)
     {
+        // Intentar delegar en ArticleService
+        try {
+            if (!class_exists(\App\Article\ArticleService::class)) {
+                if (file_exists(__DIR__ . "/../vendor/autoload.php")) {
+                    require_once __DIR__ . "/../vendor/autoload.php";
+                }
+            }
+
+            if (class_exists(\App\Article\ArticleService::class)) {
+                $service = new \App\Article\ArticleService();
+                return $service->createArticle($titulo, $contenido, $imagen, $categoria, (int)$usuario);
+            }
+        } catch (\Throwable $e) {
+            error_log('ArticleService insertarArticulo (class) error: ' . $e->getMessage());
+        }
+
         $sql = "INSERT INTO articles (title, article, image, category, user, date) VALUES (?, ?, ?, ?, ?, NOW())";
         $stmt = mysqli_prepare($conexion, $sql);
         mysqli_stmt_bind_param($stmt, "ssssis", $titulo, $contenido, $imagen, $categoria, $usuario);
@@ -125,6 +141,25 @@ class Articles
      */
     public function obtenerArticuloPorId($conexion, $article_id, $user_id)
     {
+        try {
+            if (!class_exists(\App\Article\ArticleRepository::class)) {
+                if (file_exists(__DIR__ . "/../vendor/autoload.php")) {
+                    require_once __DIR__ . "/../vendor/autoload.php";
+                }
+            }
+
+            if (class_exists(\App\Article\ArticleRepository::class)) {
+                $repo = new \App\Article\ArticleRepository();
+                $art = $repo->getArticleById((int)$article_id);
+                if ($art && isset($art['user']) && (int)$art['user'] === (int)$user_id) {
+                    return ['title' => $art['title']];
+                }
+                return null;
+            }
+        } catch (\Throwable $e) {
+            error_log('ArticleRepository obtenerArticuloPorId (class) error: ' . $e->getMessage());
+        }
+
         $sql = "SELECT title FROM articles WHERE id = ? AND user = ?";
         $stmt = mysqli_prepare($conexion, $sql);
         mysqli_stmt_bind_param($stmt, "ii", $article_id, $user_id);
@@ -150,6 +185,21 @@ class Articles
      */
     public function obtenerArticulosPaginados($conexion, $limite, $offset)
     {
+        try {
+            if (!class_exists(\App\Article\ArticleRepository::class)) {
+                if (file_exists(__DIR__ . "/../vendor/autoload.php")) {
+                    require_once __DIR__ . "/../vendor/autoload.php";
+                }
+            }
+
+            if (class_exists(\App\Article\ArticleRepository::class)) {
+                $repo = new \App\Article\ArticleRepository();
+                return $repo->getArticles((int)$limite, (int)$offset);
+            }
+        } catch (\Throwable $e) {
+            error_log('ArticleRepository obtenerArticulosPaginados (class) error: ' . $e->getMessage());
+        }
+
         $sql = "SELECT 
                 a.id,
                 a.title,
@@ -175,6 +225,21 @@ class Articles
      */
     public function contarArticulos($conexion)
     {
+        try {
+            if (!class_exists(\App\Article\ArticleService::class)) {
+                if (file_exists(__DIR__ . "/../vendor/autoload.php")) {
+                    require_once __DIR__ . "/../vendor/autoload.php";
+                }
+            }
+
+            if (class_exists(\App\Article\ArticleService::class)) {
+                $service = new \App\Article\ArticleService();
+                return $service->countArticles();
+            }
+        } catch (\Throwable $e) {
+            error_log('ArticleService contarArticulos (class) error: ' . $e->getMessage());
+        }
+
         $sql = "SELECT COUNT(*) AS total FROM articles";
         $result = $conexion->query($sql);
         $row = $result->fetch_assoc();
@@ -193,6 +258,23 @@ class Articles
      */
     public function actualizarArticulo($conexion, $id, $titulo, $contenido, $imagen, $categoria)
     {
+        try {
+            if (!class_exists(\App\Article\ArticleService::class)) {
+                if (file_exists(__DIR__ . "/../vendor/autoload.php")) {
+                    require_once __DIR__ . "/../vendor/autoload.php";
+                }
+            }
+
+            if (class_exists(\App\Article\ArticleService::class)) {
+                $service = new \App\Article\ArticleService();
+                // Si se quiere preservar la imagen existente, pasar null cuando corresponda
+                $img = $imagen ?: null;
+                return $service->updateArticle((int)$id, $titulo, $contenido, $img, $categoria);
+            }
+        } catch (\Throwable $e) {
+            error_log('ArticleService actualizarArticulo (class) error: ' . $e->getMessage());
+        }
+
         $sql = "UPDATE articles SET title=?, article=?, image=?, category=? WHERE id=?";
         $stmt = mysqli_prepare($conexion, $sql);
         mysqli_stmt_bind_param($stmt, "ssssi", $titulo, $contenido, $imagen, $categoria, $id);
@@ -211,6 +293,21 @@ class Articles
      */
     public function eliminarArticulo($conexion, $article_id, $user_id)
     {
+        try {
+            if (!class_exists(\App\Article\ArticleService::class)) {
+                if (file_exists(__DIR__ . "/../vendor/autoload.php")) {
+                    require_once __DIR__ . "/../vendor/autoload.php";
+                }
+            }
+
+            if (class_exists(\App\Article\ArticleService::class)) {
+                $service = new \App\Article\ArticleService();
+                return $service->deleteArticle((int)$article_id, (int)$user_id);
+            }
+        } catch (\Throwable $e) {
+            error_log('ArticleService eliminarArticulo (class) error: ' . $e->getMessage());
+        }
+
         $sql = "DELETE FROM articles WHERE id = ? AND user = ?";
         $stmt = mysqli_prepare($conexion, $sql);
         mysqli_stmt_bind_param($stmt, "ii", $article_id, $user_id);
@@ -228,6 +325,21 @@ class Articles
      */
     public function buscarArticulos($conexion, $search)
     {
+        try {
+            if (!class_exists(\App\Article\ArticleService::class)) {
+                if (file_exists(__DIR__ . "/../vendor/autoload.php")) {
+                    require_once __DIR__ . "/../vendor/autoload.php";
+                }
+            }
+
+            if (class_exists(\App\Article\ArticleService::class)) {
+                $service = new \App\Article\ArticleService();
+                return $service->getArticlesArray(1000, 0, $search);
+            }
+        } catch (\Throwable $e) {
+            error_log('ArticleService buscarArticulos (class) error: ' . $e->getMessage());
+        }
+
         $search = $conexion->real_escape_string($search);
         $sql = "SELECT a.id, a.title, a.date, a.image, a.article, u.username, a.category
                 FROM articles a
@@ -258,6 +370,21 @@ class Articles
     public function obtenerArticulosConBusqueda($conexion, $buscar, $paginaActual, $articulosPorPagina)
     {
         $offset = ($paginaActual - 1) * $articulosPorPagina;
+        try {
+            if (!class_exists(\App\Article\ArticleService::class)) {
+                if (file_exists(__DIR__ . "/../vendor/autoload.php")) {
+                    require_once __DIR__ . "/../vendor/autoload.php";
+                }
+            }
+
+            if (class_exists(\App\Article\ArticleService::class)) {
+                $service = new \App\Article\ArticleService();
+                return $service->getArticlesArray($articulosPorPagina, $offset, $buscar);
+            }
+        } catch (\Throwable $e) {
+            error_log('ArticleService obtenerArticulosConBusqueda (class) error: ' . $e->getMessage());
+        }
+
         $whereClause = '';
 
         if (!empty($buscar)) {
@@ -285,7 +412,7 @@ class Articles
      * @param string $buscar Término de búsqueda.
      * @return int Número total de artículos.
      */
-    public function contarArticulos($conexion, $buscar)
+    public function contarArticulosConFiltro($conexion, $buscar)
     {
         $whereClause = '';
 

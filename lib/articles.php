@@ -16,6 +16,22 @@
  * @throws Exception Si ocurre un error al preparar o ejecutar la consulta.
  */
 function insertarArticulo($conexion, $titulo, $contenido, $imagen, $categoria, $usuario) {
+    // Intentar usar ArticleService/Repository si existe (mantener compatibilidad)
+    try {
+        if (!class_exists(\App\Article\ArticleService::class)) {
+            if (file_exists(__DIR__ . "/../vendor/autoload.php")) {
+                require_once __DIR__ . "/../vendor/autoload.php";
+            }
+        }
+
+        if (class_exists(\App\Article\ArticleService::class)) {
+            $service = new \App\Article\ArticleService();
+            return $service->createArticle($titulo, $contenido, $imagen, $categoria, (int)$usuario);
+        }
+    } catch (\Throwable $e) {
+        error_log('ArticleService insertarArticulo error: ' . $e->getMessage());
+    }
+
     $sql = "INSERT INTO articles (title, article, image, category, user, date) VALUES (?, ?, ?, ?, ?, NOW())";
     $stmt = mysqli_prepare($conexion, $sql);
     mysqli_stmt_bind_param($stmt, "ssssis", $titulo, $contenido, $imagen, $categoria, $usuario);
@@ -33,6 +49,26 @@ function insertarArticulo($conexion, $titulo, $contenido, $imagen, $categoria, $
  * @return array|null Datos del artículo o null si no se encuentra.
  */
 function obtenerArticuloPorId($conexion, $article_id, $user_id) {
+    // Intentar usar ArticleRepository/Service
+    try {
+        if (!class_exists(\App\Article\ArticleRepository::class)) {
+            if (file_exists(__DIR__ . "/../vendor/autoload.php")) {
+                require_once __DIR__ . "/../vendor/autoload.php";
+            }
+        }
+
+        if (class_exists(\App\Article\ArticleRepository::class)) {
+            $repo = new \App\Article\ArticleRepository();
+            $art = $repo->getArticleById((int)$article_id);
+            if ($art && isset($art['user']) && (int)$art['user'] === (int)$user_id) {
+                return ['title' => $art['title']];
+            }
+            return null;
+        }
+    } catch (\Throwable $e) {
+        error_log('ArticleRepository obtenerArticuloPorId error: ' . $e->getMessage());
+    }
+
     $sql = "SELECT title FROM articles WHERE id = ? AND user = ?";
     $stmt = mysqli_prepare($conexion, $sql);
     mysqli_stmt_bind_param($stmt, "ii", $article_id, $user_id);
@@ -57,6 +93,22 @@ function obtenerArticuloPorId($conexion, $article_id, $user_id) {
  * @return mysqli_result Resultado de la consulta.
  */
 function obtenerArticulos($conexion, $limite, $offset) {
+    // Preferir ArticleRepository (devuelve mysqli_result) para compatibilidad
+    try {
+        if (!class_exists(\App\Article\ArticleRepository::class)) {
+            if (file_exists(__DIR__ . "/../vendor/autoload.php")) {
+                require_once __DIR__ . "/../vendor/autoload.php";
+            }
+        }
+
+        if (class_exists(\App\Article\ArticleRepository::class)) {
+            $repo = new \App\Article\ArticleRepository();
+            return $repo->getArticles((int)$limite, (int)$offset);
+        }
+    } catch (\Throwable $e) {
+        error_log('ArticleRepository obtenerArticulos error: ' . $e->getMessage());
+    }
+
     $sql = "SELECT a.id, a.title, a.date, a.image, a.article, u.username, a.category
             FROM articles a
             JOIN users u ON a.user = u.id
@@ -74,6 +126,21 @@ function obtenerArticulos($conexion, $limite, $offset) {
  * @return int Número total de artículos.
  */
 function contarArticulos($conexion) {
+    try {
+        if (!class_exists(\App\Article\ArticleService::class)) {
+            if (file_exists(__DIR__ . "/../vendor/autoload.php")) {
+                require_once __DIR__ . "/../vendor/autoload.php";
+            }
+        }
+
+        if (class_exists(\App\Article\ArticleService::class)) {
+            $service = new \App\Article\ArticleService();
+            return $service->countArticles();
+        }
+    } catch (\Throwable $e) {
+        error_log('ArticleService contarArticulos error: ' . $e->getMessage());
+    }
+
     $sql = "SELECT COUNT(*) AS total FROM articles";
     $result = $conexion->query($sql);
     $row = $result->fetch_assoc();
@@ -89,6 +156,21 @@ function contarArticulos($conexion) {
  * @throws Exception Si ocurre un error al preparar o ejecutar la consulta.
  */
 function eliminarArticulo($conexion, $article_id, $user_id) {
+    try {
+        if (!class_exists(\App\Article\ArticleService::class)) {
+            if (file_exists(__DIR__ . "/../vendor/autoload.php")) {
+                require_once __DIR__ . "/../vendor/autoload.php";
+            }
+        }
+
+        if (class_exists(\App\Article\ArticleService::class)) {
+            $service = new \App\Article\ArticleService();
+            return $service->deleteArticle((int)$article_id, (int)$user_id);
+        }
+    } catch (\Throwable $e) {
+        error_log('ArticleService eliminarArticulo error: ' . $e->getMessage());
+    }
+
     $sql = "DELETE FROM articles WHERE id = ? AND user = ?";
     $stmt = mysqli_prepare($conexion, $sql);
     mysqli_stmt_bind_param($stmt, "ii", $article_id, $user_id);
@@ -105,6 +187,22 @@ function eliminarArticulo($conexion, $article_id, $user_id) {
  * @throws Exception Si ocurre un error al preparar o ejecutar la consulta.
  */
 function buscarArticulos($conexion, $search) {
+    // Intentar usar ArticleService
+    try {
+        if (!class_exists(\App\Article\ArticleService::class)) {
+            if (file_exists(__DIR__ . "/../vendor/autoload.php")) {
+                require_once __DIR__ . "/../vendor/autoload.php";
+            }
+        }
+
+        if (class_exists(\App\Article\ArticleService::class)) {
+            $service = new \App\Article\ArticleService();
+            return $service->getArticlesArray(1000, 0, $search);
+        }
+    } catch (\Throwable $e) {
+        error_log('ArticleService buscarArticulos error: ' . $e->getMessage());
+    }
+
     $search = $conexion->real_escape_string($search);
     $sql = "SELECT a.id, a.title, a.date, a.image, a.article, u.username, a.category
             FROM articles a

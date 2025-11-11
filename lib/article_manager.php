@@ -18,6 +18,22 @@ function obtenerArticulos($conexion, $buscar, $paginaActual, $articulosPorPagina
         $whereClause = "WHERE title LIKE '%$buscar%' OR category LIKE '%$buscar%'";
     }
 
+    // Intentar usar ArticleService si está disponible (migración gradual)
+    try {
+        if (!class_exists(\App\Article\ArticleService::class)) {
+            if (file_exists(__DIR__ . "/../vendor/autoload.php")) {
+                require_once __DIR__ . "/../vendor/autoload.php";
+            }
+        }
+
+        if (class_exists(\App\Article\ArticleService::class)) {
+            $service = new \App\Article\ArticleService();
+            return $service->getArticlesArray($articulosPorPagina, $offset, $buscar);
+        }
+    } catch (\Throwable $e) {
+        error_log('ArticleService obtenerArticulos error: ' . $e->getMessage());
+    }
+
     $sql = "SELECT id, user, title, image, category, date FROM articles $whereClause ORDER BY date DESC, id DESC LIMIT $articulosPorPagina OFFSET $offset";
     $result = $conexion->query($sql);
 
@@ -44,6 +60,22 @@ function contarArticulos($conexion, $buscar) {
     if (!empty($buscar)) {
         $buscar = $conexion->real_escape_string($buscar);
         $whereClause = "WHERE title LIKE '%$buscar%' OR category LIKE '%$buscar%'";
+    }
+
+    // Intentar usar ArticleService si está disponible
+    try {
+        if (!class_exists(\App\Article\ArticleService::class)) {
+            if (file_exists(__DIR__ . "/../vendor/autoload.php")) {
+                require_once __DIR__ . "/../vendor/autoload.php";
+            }
+        }
+
+        if (class_exists(\App\Article\ArticleService::class)) {
+            $service = new \App\Article\ArticleService();
+            return $service->countArticles($buscar);
+        }
+    } catch (\Throwable $e) {
+        error_log('ArticleService contarArticulos error: ' . $e->getMessage());
     }
 
     $sql = "SELECT COUNT(*) AS total FROM articles $whereClause";

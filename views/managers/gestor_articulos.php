@@ -15,8 +15,25 @@ $paginaActualArticulos = isset($_GET['pagina_articulos']) ? (int)$_GET['pagina_a
 $buscar = isset($_GET['buscar']) ? $_GET['buscar'] : '';
 
 // Obtener los artículos y la información de paginación
-$articulos = obtenerArticulos($conexion, $buscar, $paginaActualArticulos, $articulosPorPagina);
-$totalArticulos = contarArticulos($conexion, $buscar);
+$articulos = [];
+$offset = ($paginaActualArticulos - 1) * $articulosPorPagina;
+// Intentar usar el nuevo servicio para obtener artículos (compatibilidad gradual)
+try {
+    if (!class_exists('\App\Article\ArticleService')) {
+        if (file_exists(__DIR__ . '/../../vendor/autoload.php')) {
+            require_once __DIR__ . '/../../vendor/autoload.php';
+        }
+    }
+    $articleService = new \App\Article\ArticleService();
+    $articulos = $articleService->getArticlesArray($articulosPorPagina, $offset);
+} catch (\Throwable $e) {
+    error_log('ArticleService error (gestor): ' . $e->getMessage());
+    // Fallback al método legacy
+    $articulos = obtenerArticulos($conexion, $buscar, $paginaActualArticulos, $articulosPorPagina);
+}
+
+// Obtener total de artículos (se mantiene la lógica previa, ya reemplazada antes en este archivo)
+// $totalArticulos ya se calcula más abajo mediante ArticleRepository o fallback.
 $totalPaginasArticulos = ceil($totalArticulos / $articulosPorPagina);
 ?>
 
