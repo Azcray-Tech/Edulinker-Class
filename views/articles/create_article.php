@@ -40,12 +40,33 @@ include(__DIR__ . "/../../includes/head.php");
             setup: function (editor) {
                 editor.on('init', function () {
                     editor.execCommand('JustifyLeft');
+                    <?php if (isset($_SESSION['form_data']['article'])): ?>
+                        editor.setContent(<?php echo json_encode($_SESSION['form_data']['article']); ?>);
+                    <?php endif; ?>
                 });
             }
         });
     </script>
 
 <body class="d-flex flex-column min-vh-100">
+
+    <?php
+    // Display success message
+    if (isset($_SESSION['success_message'])) {
+        echo '<div class="alert alert-success text-center mt-3">' . htmlspecialchars($_SESSION['success_message']) . '</div>';
+        unset($_SESSION['success_message']);
+    }
+
+    // Display validation errors
+    if (isset($_SESSION['form_errors']) && !empty($_SESSION['form_errors'])) {
+        echo '<div class="alert alert-danger mt-3"><ul>';
+        foreach ($_SESSION['form_errors'] as $error) {
+            echo '<li>' . htmlspecialchars($error) . '</li>';
+        }
+        echo '</ul></div>';
+        unset($_SESSION['form_errors']); // Clear errors after displaying
+    }
+    ?>
 
     <div id="loading-overlay">
         <div class="spinner-border text-primary" role="status">
@@ -59,8 +80,8 @@ include(__DIR__ . "/../../includes/head.php");
             <div class="col-12 col-md-9">
                 <form action="<?php echo CONTROLLERS_URL; ?>articles/process_articles.php" method="post" enctype="multipart/form-data">
                     <div class="mb-4">
-                        <input type="text" name="title" id="title" class="form-control my-2" placeholder="Título" required>
-                        <textarea rows="25" name="article" id="editor" placeholder="Empieza a escribir tu nuevo artículo..."></textarea>
+                        <input type="text" name="title" id="title" class="form-control my-2" placeholder="Título" required value="<?php echo htmlspecialchars($_SESSION['form_data']['title'] ?? ''); ?>">
+                        <textarea rows="25" name="article" id="editor" placeholder="Empieza a escribir tu nuevo artículo..."><?php echo htmlspecialchars($_SESSION['form_data']['article'] ?? ''); ?></textarea>
                     </div>
                 </div>
                 <div class="col-12 col-md-3">
@@ -79,14 +100,21 @@ include(__DIR__ . "/../../includes/head.php");
                             <label class="form-label fw-semibold fs-6 text-primary" for="select_category">Seleccione la Categoría.</label>
                             <select class="form-select" name="category" id="select_category" required>
                                 <option value="">Seleccione una categoría.</option>
-                                <?php foreach ($categorias as $categoria): ?>
-                                    <option value="<?= htmlspecialchars($categoria['nombre']) ?>"><?= htmlspecialchars($categoria['nombre']) ?></option>
+                                <?php
+                                $selectedCategory = $_SESSION['form_data']['category'] ?? '';
+                                foreach ($categorias as $categoria):
+                                    $categoryId = htmlspecialchars($categoria['id']); // Assuming 'id' is the value to match
+                                    $categoryName = htmlspecialchars($categoria['nombre']);
+                                    $selected = ($categoryId == $selectedCategory) ? 'selected' : '';
+                                ?>
+                                    <option value="<?= $categoryId ?>" <?= $selected ?>><?= $categoryName ?></option>
                                 <?php endforeach; ?>
                             </select>
                         </div>
                     </div>
                 </div>
             </form>
+<?php unset($_SESSION['form_data']); // Clear form data after displaying ?>
         </div>
     </div>
     <div class="mt-5">
