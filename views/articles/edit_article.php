@@ -9,6 +9,7 @@
 
  include(__DIR__ . "/../../lib/constants.php");
  include_once(__DIR__ . "/../../lib/common.php");
+ include_once(__DIR__ . "/../../lib/articles.php"); // Needed for obtenerArticuloPorId or ArticleService
 
 if (!isset($_GET['id']) || !is_numeric($_GET['id'])) {
     header("Location:" . __DIR__ . "/../../index.php");
@@ -35,14 +36,16 @@ try {
 
 // Fallback legacy si no se obtuvo con el servicio
 if (!$article_data) {
-    $sql_articulo = "SELECT id, title, article, image, category FROM articles WHERE id = ?";
+    // Usar la función obtenerArticulo (que ya hace JOIN con users) o una consulta directa
+    // para obtener el user_id del artículo.
+    $sql_articulo = "SELECT id, title, article, image, category, user FROM articles WHERE id = ?";
     $stmt_articulo = mysqli_prepare($conexion, $sql_articulo);
     mysqli_stmt_bind_param($stmt_articulo, "i", $article_id);
     mysqli_stmt_execute($stmt_articulo);
     $result_articulo = mysqli_stmt_get_result($stmt_articulo);
 
     if (!$result_articulo || mysqli_num_rows($result_articulo) == 0) {
-        header("Location: index.php");
+        header("Location: " . BASE_URL . "index.php");
         exit();
     }
 
@@ -50,10 +53,25 @@ if (!$article_data) {
     mysqli_stmt_close($stmt_articulo);
 }
 
+// DEBUGGING: Log session and article data
+error_log("DEBUG: User ID: " . (isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 'N/A'));
+error_log("DEBUG: User Role: " . (isset($_SESSION['rol']) ? $_SESSION['rol'] : 'N/A'));
+error_log("DEBUG: Article Author ID: " . (isset($article_data['user']) ? $article_data['user'] : 'N/A'));
+error_log("DEBUG: isAdmin() result: " . (isAdmin() ? 'true' : 'false'));
+
+// 3. Verificar si el usuario actual es el autor del artículo o un administrador/profesor
+if ($article_data['user'] !== (int)$_SESSION['user_id'] && !isAdmin()) {
+    header("Location:" . BASE_URL . "index.php"); // Redirigir si no tiene permisos
+    exit();
+}
+
 $article_title = htmlspecialchars($article_data['title']);
 $article_content = htmlspecialchars($article_data['article']);
 $article_image = htmlspecialchars($article_data['image']);
 $article_category_id = $article_data['category'];
+
+// DEBUGGING: Log category data
+error_log("DEBUG: Article Category ID from DB: " . $article_category_id . " (Type: " . gettype($article_category_id) . ")");
 
 // Obtener la lista de categorías para el select (usar helper legacy si está disponible)
 $categories = [];
@@ -148,7 +166,8 @@ include(__DIR__ . "/../../includes/head.php");
                                         echo "";
                                         echo "\n";
                                         echo "\n";
-                                        $selected = ($cat_id == $article_category_id) ? 'selected' : '';
+                                        // Compare category name from DB with category name in options
+                                        $selected = (htmlspecialchars_decode($cat_name) == $article_category_id) ? 'selected' : '';
                                         echo "<option value=\"$cat_id\" $selected>$cat_name</option>";
                                     }
                                 } else {

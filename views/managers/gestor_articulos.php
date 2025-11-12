@@ -32,8 +32,21 @@ try {
     $articulos = obtenerArticulos($conexion, $buscar, $paginaActualArticulos, $articulosPorPagina);
 }
 
-// Obtener total de artículos (se mantiene la lógica previa, ya reemplazada antes en este archivo)
-// $totalArticulos ya se calcula más abajo mediante ArticleRepository o fallback.
+// Obtener total de artículos
+$totalArticulos = 0;
+try {
+    if (!class_exists('\App\Article\ArticleRepository')) {
+        if (file_exists(__DIR__ . '/../../vendor/autoload.php')) {
+            require_once __DIR__ . '/../../vendor/autoload.php';
+        }
+    }
+    $articleRepoForCount = new \App\Article\ArticleRepository();
+    $totalArticulos = $articleRepoForCount->countArticles();
+} catch (\Throwable $e) {
+    error_log('ArticleRepository count error (gestor): ' . $e->getMessage());
+    // Fallback al método legacy
+    $totalArticulos = isset($conexion) ? contarArticulos($conexion) : 0;
+}
 $totalPaginasArticulos = ceil($totalArticulos / $articulosPorPagina);
 ?>
 

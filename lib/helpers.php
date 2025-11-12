@@ -73,3 +73,35 @@ function verificarPermiso($rol_requerido_id) {
 
     return $_SESSION['rol_id'] == $rol_requerido_id;
 }
+
+/**
+ * Sanitiza el contenido HTML de un artículo, eliminando atributos no deseados como 'contenteditable'.
+ * @param string $html El contenido HTML a sanitizar.
+ * @return string El contenido HTML sanitizado.
+ */
+function sanitizeArticleContent($html) {
+    // Usar DOMDocument para parsear y manipular el HTML de forma segura
+    $dom = new DOMDocument();
+    // Suprimir errores de HTML mal formado
+    libxml_use_internal_errors(true);
+    $dom->loadHTML('<div>' . $html . '</div>', LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD);
+    libxml_clear_errors();
+
+    $xpath = new DOMXPath($dom);
+    $nodes = $xpath->query('//@contenteditable');
+
+    foreach ($nodes as $node) {
+        if ($node instanceof DOMAttr && $node->ownerElement) {
+            $node->ownerElement->removeAttribute($node->name);
+        }
+    }
+
+    // Obtener el HTML del body (o del div que envolvimos)
+    $body = $dom->getElementsByTagName('div')->item(0);
+    $sanitizedHtml = '';
+    foreach ($body->childNodes as $node) {
+        $sanitizedHtml .= $dom->saveHTML($node);
+    }
+
+    return $sanitizedHtml;
+}

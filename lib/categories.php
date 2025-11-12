@@ -3,7 +3,8 @@ include_once(__DIR__ . "/constants.php");
 include_once(__DIR__ . "/common.php");
 
 function obtenerCategorias($conexion) {
-    $sql_categorias = "SELECT id, nombre, imagen, text FROM category";
+    // Seleccionamos todas las columnas necesarias para mostrar las categorías, incluyendo imagen y texto.
+    $sql_categorias = "SELECT id, nombre, imagen, text FROM category ORDER BY nombre ASC";
     $result_categorias = mysqli_query($conexion, $sql_categorias);
 
     if ($result_categorias && mysqli_num_rows($result_categorias) > 0) {

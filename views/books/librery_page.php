@@ -12,6 +12,13 @@ $librosPorPagina = 24;
 $paginaActual = isset($_GET['pagina']) ? intval($_GET['pagina']) : 1;
 $offset = ($paginaActual - 1) * $librosPorPagina;
 
+// Comprobar que la tabla 'books' exista para evitar excepciones si el esquema no la incluye.
+function tableExists($conexion, $tableName) {
+    $tbl = $conexion->real_escape_string($tableName);
+    $res = $conexion->query("SHOW TABLES LIKE '$tbl'");
+    return ($res && $res->num_rows > 0);
+}
+
 // Construcción de la cláusula WHERE para la consulta de conteo
 $whereClauseCount = "WHERE 1=1";
 $paramsCount = [];
@@ -24,63 +31,72 @@ if (!empty($filtroCategoria)) {
 }
 
 // Consulta para obtener el total de libros filtrados
-$sqlTotalLibros = "SELECT COUNT(id) AS total FROM books $whereClauseCount";
-$stmtTotal = $conexion->prepare($sqlTotalLibros);
-
-if ($stmtTotal) {
-    if (!empty($paramsCount)) {
-        $stmtTotal->bind_param($typesCount, ...$paramsCount);
-    }
-    $stmtTotal->execute();
-    $resultTotal = $stmtTotal->get_result();
-    $totalLibros = $resultTotal->fetch_assoc()['total'] ?? 0;
-    $stmtTotal->close();
-} else {
-    echo "Error al preparar la consulta de conteo: " . $conexion->error;
+// Si la tabla 'books' no existe, evitamos ejecutar consultas que producirían excepciones
+if (!tableExists($conexion, 'books')) {
+    // Variables por defecto para la vista: no hay libros ni categorías
     $totalLibros = 0;
-}
+    $totalPaginas = 0;
+    $resultLibros = false;
+    $resultCategorias = false;
+} else {
+    $sqlTotalLibros = "SELECT COUNT(id) AS total FROM books $whereClauseCount";
+    $stmtTotal = $conexion->prepare($sqlTotalLibros);
 
-$totalPaginas = ceil($totalLibros / $librosPorPagina);
-
-// Construcción de la cláusula WHERE para la consulta de libros con paginación
-$whereClauseLibros = "WHERE 1=1";
-$paramsLibros = [];
-$typesLibros = "";
-
-if (!empty($filtroCategoria)) {
-    $whereClauseLibros .= " AND category = ?";
-    $paramsLibros[] = $filtroCategoria;
-    $typesLibros .= "s";
-}
-
-// Consulta para obtener los libros filtrados con paginación
-$sqlLibros = "SELECT id, title, image, category FROM books $whereClauseLibros LIMIT ?, ?";
-$stmtLibros = $conexion->prepare($sqlLibros);
-
-if ($stmtLibros) {
-    $paramsBind = [...$paramsLibros, $offset, $librosPorPagina];
-    $typesBind = $typesLibros . "ii";
-    if (!empty($paramsBind)) {
-        $stmtLibros->bind_param($typesBind, ...$paramsBind);
+    if ($stmtTotal) {
+        if (!empty($paramsCount)) {
+            $stmtTotal->bind_param($typesCount, ...$paramsCount);
+        }
+        $stmtTotal->execute();
+        $resultTotal = $stmtTotal->get_result();
+        $totalLibros = $resultTotal->fetch_assoc()['total'] ?? 0;
+        $stmtTotal->close();
     } else {
-        $stmtLibros->bind_param("ii", $offset, $librosPorPagina);
+        echo "Error al preparar la consulta de conteo: " . $conexion->error;
+        $totalLibros = 0;
     }
-    $stmtLibros->execute();
-    $resultLibros = $stmtLibros->get_result();
 
-    if (!$resultLibros) {
-        echo "Error al ejecutar la consulta de libros: " . $conexion->error;
+    $totalPaginas = ceil($totalLibros / $librosPorPagina);
+
+    // Construcción de la cláusula WHERE para la consulta de libros con paginación
+    $whereClauseLibros = "WHERE 1=1";
+    $paramsLibros = [];
+    $typesLibros = "";
+
+    if (!empty($filtroCategoria)) {
+        $whereClauseLibros .= " AND category = ?";
+        $paramsLibros[] = $filtroCategoria;
+        $typesLibros .= "s";
+    }
+
+    // Consulta para obtener los libros filtrados con paginación
+    $sqlLibros = "SELECT id, title, image, category FROM books $whereClauseLibros LIMIT ?, ?";
+    $stmtLibros = $conexion->prepare($sqlLibros);
+
+    if ($stmtLibros) {
+        $paramsBind = [...$paramsLibros, $offset, $librosPorPagina];
+        $typesBind = $typesLibros . "ii";
+        if (!empty($paramsBind)) {
+            $stmtLibros->bind_param($typesBind, ...$paramsBind);
+        } else {
+            $stmtLibros->bind_param("ii", $offset, $librosPorPagina);
+        }
+        $stmtLibros->execute();
+        $resultLibros = $stmtLibros->get_result();
+
+        if (!$resultLibros) {
+            echo "Error al ejecutar la consulta de libros: " . $conexion->error;
+            $resultLibros = false;
+        }
+        $stmtLibros->close();
+    } else {
+        echo "Error al preparar la consulta de libros: " . $conexion->error;
         $resultLibros = false;
     }
-    $stmtLibros->close();
-} else {
-    echo "Error al preparar la consulta de libros: " . $conexion->error;
-    $resultLibros = false;
-}
 
-// Consulta para obtener todas las categorías únicas para el filtro
-$sqlCategorias = "SELECT DISTINCT category FROM books ORDER BY category ASC";
-$resultCategorias = $conexion->query($sqlCategorias);
+    // Consulta para obtener todas las categorías únicas para el filtro
+    $sqlCategorias = "SELECT DISTINCT category FROM books ORDER BY category ASC";
+    $resultCategorias = $conexion->query($sqlCategorias);
+}
 
 
 include(__DIR__ . "/../../includes/head.php");

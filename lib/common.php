@@ -4,7 +4,24 @@ include(__DIR__ . "/../config/conexion_mysqli.php");
 date_default_timezone_set('America/Caracas');
 
 global $conexion;
-$conexion = new mysqli($servername, $username, $password, $dbname);
+// `config/conexion_mysqli.php` intenta crear $conexion usando variables de entorno.
+// Evitar sobrescribir y evitar uso de variables legacy indefinidas ($servername, etc.).
+if (!isset($conexion) || !($conexion instanceof mysqli)) {
+    // Fallback seguro: crear conexión desde variables de entorno o valores por defecto.
+    mysqli_report(MYSQLI_REPORT_ERROR | MYSQLI_REPORT_STRICT);
+    $dbHost = getenv('APP_DB_HOST') !== false && getenv('APP_DB_HOST') !== '' ? getenv('APP_DB_HOST') : 'localhost';
+    $dbUser = getenv('APP_DB_USER') !== false && getenv('APP_DB_USER') !== '' ? getenv('APP_DB_USER') : 'root';
+    $dbPass = getenv('APP_DB_PASS') !== false && getenv('APP_DB_PASS') !== '' ? getenv('APP_DB_PASS') : '';
+    $dbName = getenv('APP_DB_NAME') !== false && getenv('APP_DB_NAME') !== '' ? getenv('APP_DB_NAME') : 'edulinker';
+
+    try {
+        $conexion = new mysqli($dbHost, $dbUser, $dbPass, $dbName);
+    } catch (mysqli_sql_exception $e) {
+        http_response_code(500);
+        echo "Fatal error: could not connect to database ({$dbHost}): " . htmlspecialchars($e->getMessage());
+        exit;
+    }
+}
 
 if (!function_exists('cortarTexto')) {
     function cortarTexto($text, $chart = 450){
@@ -17,7 +34,7 @@ if (!function_exists('cortarTexto')) {
 }
 
 function isAdmin() {
-    if (isset($_SESSION['user_role']) && ($_SESSION['user_role'] == 'admin' || $_SESSION['user_role'] == 'profesor')) {
+    if (isset($_SESSION['rol']) && ($_SESSION['rol'] == 'admin' || $_SESSION['rol'] == 'profesor' || $_SESSION['rol'] == 'administrador')) {
         return true;
     }
     return false;

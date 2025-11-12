@@ -73,7 +73,14 @@ if (isset($_POST['update_article'])) {
         mysqli_stmt_close($stmt_articulo);
     }
 
-    if ($article_user_id != $user_id) {
+    // DEBUGGING: Log session and article data in update_article.php
+    error_log("UPDATE_DEBUG: User ID: " . (isset($_SESSION['user_id']) ? $_SESSION['user_id'] : 'N/A'));
+    error_log("UPDATE_DEBUG: User Role: " . (isset($_SESSION['rol']) ? $_SESSION['rol'] : 'N/A'));
+    error_log("UPDATE_DEBUG: Article Author ID: " . (isset($article_user_id) ? $article_user_id : 'N/A'));
+    error_log("UPDATE_DEBUG: isAdmin() result: " . (isAdmin() ? 'true' : 'false'));
+
+    // Allow editing if current user is the author OR an administrator/professor
+    if ($article_user_id != $user_id && !isAdmin()) {
         echo "No tienes permiso para editar este artículo.";
         exit();
     }

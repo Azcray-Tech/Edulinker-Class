@@ -1,8 +1,14 @@
 <?php 
 define ("SEGUIR_LEYENDO", "Seguir leyendo...");
 
-// Ruta base del proyecto (ajustada al nombre real de la carpeta)
-define('BASE_URL', '/Edulinker-Class/');
+// Obtener la base URL desde la variable de entorno o usar valor por defecto
+
+$envBase = getenv('APP_BASE_URL');
+if ($envBase !== false && $envBase !== '') {
+    define('BASE_URL', rtrim($envBase, '/') . '/');
+} else {
+    define('BASE_URL', '/Edulinker-Class/');
+}
 
 // Rutas específicas
 define('ASSETS_URL', BASE_URL . 'assets/');

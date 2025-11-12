@@ -51,10 +51,15 @@ include(__DIR__ . "/../../includes/head.php");
                         foreach ($categoriasPaginadas as $categoria) {
                             echo '<div class="col-md-4 mb-4">';
                             echo '<div class="card h-100 d-flex flex-column" style="width: 25rem;" >';
-                            echo '<img width="250" height="150" src="' . UPLOADS_URL . 'categories/cover/' . $categoria["imagen"] . '" class="card-img-top img-fluid" style="height: 150px; object-fit: cover;" alt="' . $categoria["nombre"] . '">';
+                            // Si la categoría no tiene imagen o texto (esquema mínimo), usar placeholders.
+                            $imagenCat = isset($categoria["imagen"]) && !empty($categoria["imagen"]) ? $categoria["imagen"] : 'placeholder-category.jpg';
+                            $textoCat = isset($categoria["text"]) ? $categoria["text"] : '';
+                            echo '<img width="250" height="150" src="' . UPLOADS_URL . 'categories/cover/' . $imagenCat . '" class="card-img-top img-fluid" style="height: 150px; object-fit: cover;" alt="' . $categoria["nombre"] . '">';
                             echo '<div class="card-body text-center d-flex flex-column">';
                             echo '<h5 class="card-title">' . $categoria["nombre"] . '</h5>';
-                            echo '<p class="card-text text-center">' . $categoria["text"] . '</p>';
+                            if (!empty($textoCat)) {
+                                echo '<p class="card-text text-center">' . $textoCat . '</p>';
+                            }
                             echo '<div class="d-grid gap-2 mt-auto">';
                             echo '<a href="' . VIEWS_URL . 'articles/articles_category.php?id=' . $categoria['nombre'] . '" class="btn btn-primary">Ver Artículos</a>';
                             echo '</div>';

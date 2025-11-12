@@ -84,7 +84,7 @@ include(__DIR__ . "/../../includes/head.php"); ?>
                     <div class="text-muted fst-italic mb-2">Publicado el <?php echo date("d/m/Y", strtotime($articulo['date'])) ?> por <?php echo htmlspecialchars($articulo['username']) ?></div>
                     <a class="badge bg-primary text-decoration-none link-light mb-2" href="<?php echo VIEWS_URL; ?>articles/articles_category.php?id=<?php echo htmlspecialchars($articulo['category']); ?>"><?php echo htmlspecialchars($articulo['category']); ?></a>
                     <section class="mb-5">
-                        <p style="text-align: justify;" class="fs-5 mb-4"><?php echo ($articulo['article']) ?></p>
+                        <p style="text-align: justify;" class="fs-5 mb-4" contenteditable="false"><?php echo sanitizeArticleContent($articulo['article']) ?></p>
                     </section>
                 </article>
                 <?php
