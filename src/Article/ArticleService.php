@@ -1,6 +1,8 @@
 <?php
 namespace App\Article;
 
+use App\Core\Cache;
+
 class ArticleService {
     private ArticleRepository $repo;
 
@@ -17,6 +19,13 @@ class ArticleService {
      */
     public function getArticlesArray(int $limit, int $offset, string $buscar = ''): array
     {
+        $cacheKey = 'articles_list_' . md5($limit . '_' . $offset . '_' . $buscar);
+        $cachedArticles = Cache::get($cacheKey);
+
+        if ($cachedArticles) {
+            return $cachedArticles;
+        }
+
         $result = $this->repo->getArticles($limit, $offset, $buscar);
         if (!$result) {
             return [];
@@ -27,6 +36,8 @@ class ArticleService {
             $articles[] = $row;
         }
         $result->free();
+
+        Cache::set($cacheKey, $articles);
         return $articles;
     }
 
@@ -42,7 +53,18 @@ class ArticleService {
      */
     public function getArticleById(int $id): ?array
     {
-        return $this->repo->getArticleById($id);
+        $cacheKey = 'article_' . $id;
+        $cachedArticle = Cache::get($cacheKey);
+
+        if ($cachedArticle) {
+            return $cachedArticle;
+        }
+
+        $article = $this->repo->getArticleById($id);
+        if ($article) {
+            Cache::set($cacheKey, $article);
+        }
+        return $article;
     }
 
     /**
@@ -54,6 +76,13 @@ class ArticleService {
      */
     public function getArticlesByCategoryArray(string $category, ?int $limit = null, int $offset = 0): array
     {
+        $cacheKey = 'articles_by_category_' . md5($category . '_' . $limit . '_' . $offset);
+        $cachedArticles = Cache::get($cacheKey);
+
+        if ($cachedArticles) {
+            return $cachedArticles;
+        }
+
         $result = $this->repo->getArticlesByCategory($category, $limit, $offset);
         if (!$result) {
             return [];
@@ -63,6 +92,8 @@ class ArticleService {
             $articles[] = $row;
         }
         $result->free();
+
+        Cache::set($cacheKey, $articles);
         return $articles;
     }
 
@@ -104,7 +135,12 @@ class ArticleService {
      */
     public function createArticle(string $title, string $article, string $image, string $category, int $userId): bool
     {
-        return $this->repo->insertArticle($title, $article, $image, $category, $userId);
+        $success = $this->repo->insertArticle($title, $article, $image, $category, $userId);
+        if ($success) {
+            // Clear all caches related to article lists
+            Cache::clearAll();
+        }
+        return $success;
     }
 
     /**
@@ -112,7 +148,13 @@ class ArticleService {
      */
     public function updateArticle(int $id, string $title, string $article, ?string $image, string $category): bool
     {
-        return $this->repo->updateArticle($id, $title, $article, $image, $category);
+        $success = $this->repo->updateArticle($id, $title, $article, $image, $category);
+        if ($success) {
+            // Clear relevant caches
+            Cache::forget('article_' . $id); // Invalidate specific article
+            Cache::clearAll(); // Invalidate all article lists and category specific lists
+        }
+        return $success;
     }
 
     /**
@@ -120,6 +162,16 @@ class ArticleService {
      */
     public function deleteArticle(int $id, ?int $userId = null): bool
     {
-        return $this->repo->deleteArticle($id, $userId);
+        // Before deleting, get the category to invalidate its cache
+        $article = $this->repo->getArticleById($id);
+        $category = $article['category'] ?? null;
+
+        $success = $this->repo->deleteArticle($id, $userId);
+        if ($success) {
+            // Clear relevant caches
+            Cache::forget('article_' . $id); // Invalidate specific article
+            Cache::clearAll(); // Invalidate all article lists and category specific lists
+        }
+        return $success;
     }
 }

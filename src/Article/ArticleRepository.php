@@ -20,7 +20,7 @@ class ArticleRepository {
             $sql = "SELECT a.*, u.username
                     FROM articles a
                     JOIN users u ON a.user = u.id
-                    WHERE a.title LIKE ? OR a.article LIKE ?
+                    WHERE a.title LIKE ? OR a.article LIKE ? OR a.category = ?
                     ORDER BY a.date DESC, a.id DESC
                     LIMIT ? OFFSET ?";
 
@@ -29,7 +29,7 @@ class ArticleRepository {
                 error_log('ArticleRepository prepare error (search): ' . $conexion->error);
                 return false;
             }
-            $stmt->bind_param('ssii', $like, $like, $limit, $offset);
+            $stmt->bind_param('sssii', $like, $like, $buscar, $limit, $offset);
             $stmt->execute();
             $result = $stmt->get_result();
             return $result;
@@ -62,8 +62,8 @@ class ArticleRepository {
 
         if (!empty($buscar)) {
             // Usar prepared statements para evitar SQL injection
-            $like = '%' . $conexion->real_escape_string($buscar) . '%';
-            $sql = "SELECT COUNT(*) as total FROM articles WHERE title LIKE ? OR category LIKE ?";
+            $like = '%' . $buscar . '%';
+            $sql = "SELECT COUNT(*) as total FROM articles WHERE title LIKE ? OR category = ?";
             $stmt = $conexion->prepare($sql);
             if (!$stmt) {
                 error_log('ArticleRepository count prepare error: ' . $conexion->error);

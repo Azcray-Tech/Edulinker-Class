@@ -48,6 +48,17 @@ CREATE TABLE IF NOT EXISTS articles (
   FOREIGN KEY (user) REFERENCES users(id) ON DELETE CASCADE
 );
 
+-- Indexes for articles table to improve query performance
+CREATE INDEX idx_articles_user ON articles (user);
+CREATE INDEX idx_articles_date ON articles (date);
+CREATE INDEX idx_articles_category ON articles (category);
+CREATE INDEX idx_articles_title ON articles (title);
+-- For 'article' TEXT column with LIKE '%search%', a FULLTEXT index would be more effective,
+-- but requires specific configuration and MATCH AGAINST syntax. A regular index might not
+-- be fully utilized for non-prefix LIKE searches.
+-- CREATE FULLTEXT INDEX idx_articles_article_fulltext ON articles (article);
+
+
 -- Comments (opcional)
 CREATE TABLE IF NOT EXISTS comentarios (
   id INT AUTO_INCREMENT PRIMARY KEY,
