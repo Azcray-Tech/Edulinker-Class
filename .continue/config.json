@@ -1,0 +1,9 @@
+{
+  "models": [
+    {
+      "title": "DeepSeek-R1 8B",
+      "provider": "ollama",
+      "model": "deepseek-r1:8b"
+    }
+  ]
+}

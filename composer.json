@@ -3,7 +3,8 @@
   "description": "Edulinker-Class - gradual migration to OOP",
   "type": "project",
   "require": {
-    "php": ">=7.4"
+    "php": ">=7.4",
+    "monolog/monolog": "^3.9"
   },
   "autoload": {
     "psr-4": {

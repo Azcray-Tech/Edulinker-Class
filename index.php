@@ -4,6 +4,30 @@ if (file_exists(__DIR__ . '/vendor/autoload.php')) {
     require_once __DIR__ . '/vendor/autoload.php';
 }
 
+// Load Monolog configuration
+$logger = require_once __DIR__ . '/config/monolog.php';
+
+// Set up global error and exception handling
+set_error_handler(function ($severity, $message, $file, $line) use ($logger) {
+    if (!(error_reporting() & $severity)) {
+        // This error code is not included in error_reporting
+        return;
+    }
+    $logger->error("PHP Error: {$message} in {$file} on line {$line}", ['severity' => $severity]);
+    // Optionally, redirect to a custom error page for certain severities
+    // if ($severity === E_ERROR || $severity === E_PARSE || $severity === E_CORE_ERROR || $severity === E_COMPILE_ERROR) {
+    //     header('Location: /views/errors/500.php');
+    //     exit();
+    // }
+});
+
+set_exception_handler(function ($exception) use ($logger) {
+    $logger->critical("Unhandled Exception: {$exception->getMessage()} in {$exception->getFile()} on line {$exception->getLine()}", ['exception' => $exception]);
+    // Redirect to a custom error page
+    header('Location: /views/errors/500.php');
+    exit();
+});
+
 include_once(__DIR__ . "/lib/constants.php");
 include_once(__DIR__ . "/lib/common.php");
 include_once(__DIR__ . "/lib/articles.php");
@@ -27,7 +51,7 @@ try {
     $articleRepoForCount = new \App\Article\ArticleRepository();
     $totalArticulos = $articleRepoForCount->countArticles();
 } catch (\Throwable $e) {
-    error_log('ArticleRepository count error: ' . $e->getMessage());
+    $logger->error('ArticleRepository count error: ' . $e->getMessage());
     // Fallback al método legacy
     $totalArticulos = isset($conexion) ? contarArticulos($conexion) : 0;
 }
@@ -40,7 +64,7 @@ try {
     $articleRepo = new \App\Article\ArticleRepository();
     $result = $articleRepo->getArticles($articulosPorPagina, $offset);
 } catch (\Throwable $e) {
-    error_log('ArticleRepository error: ' . $e->getMessage());
+    $logger->error('ArticleRepository error: ' . $e->getMessage());
     // Fallback al código legacy
     if (isset($conexion)) {
         $result = obtenerArticulos($conexion, $articulosPorPagina, $offset);
@@ -59,7 +83,7 @@ if (isset($_GET['search'])) {
         // Limitar a 100 resultados para la búsqueda en la página principal
         $resultados = $articleServiceForSearch->getArticlesArray(100, 0, $search);
     } catch (\Throwable $e) {
-        error_log('ArticleService search error: ' . $e->getMessage());
+        $logger->error('ArticleService search error: ' . $e->getMessage());
         // Fallback al método legacy
         $resultados = buscarArticulos($conexion, $search);
     }
@@ -103,7 +127,7 @@ if (isset($_GET['search'])) {
                             }
                             $result->free();
                         } else {
-                            error_log("Error en la consulta: " . $conexion->error, 0);
+                            $logger->error("Error en la consulta: " . $conexion->error);
                         }
                         ?>
                     </article>

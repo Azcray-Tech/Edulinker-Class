@@ -1,0 +1,39 @@
+version: "3.8"
+services:
+  php:
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    container_name: edulinker_php
+    volumes:
+      - ./:/var/www/html:cached
+    ports:
+      - "8080:80"
+    environment:
+      - APACHE_RUN_USER=www-data
+      - APACHE_RUN_GROUP=www-data
+      - APP_ENV=development
+      - APP_DB_HOST=db
+      - APP_DB_NAME=edulinker
+      - APP_DB_USER=edulinker
+      - APP_DB_PASS=secret
+      - APP_BASE_URL=/
+    depends_on:
+      - db
+
+  db:
+    image: mysql:8.0
+    container_name: edulinker_db
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: edulinker
+      MYSQL_USER: edulinker
+      MYSQL_PASSWORD: secret
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "3307:3306"
+
+volumes:
+  db_data:
