@@ -64,13 +64,23 @@ Aplicación web para la gestión de recursos de aprendizaje en un instituto de b
 
 ---
 
-## **Instalación**
+## **Instalación Windows**
 
 1. Clona este repositorio o descárgalo como archivo ZIP.
 2. Coloca los archivos en el directorio raíz de tu servidor web (por ejemplo, `c:/xampp/htdocs/`).
 3. Importa el archivo de base de datos (`database.sql`) en tu servidor MySQL.
 4. Configura la conexión a la base de datos en `config/conexion_mysqli.php`.
-5. Accede al proyecto desde tu navegador en `http://localhost/Proyecto Blog Academico - MySQLi`.
+5. Accede al proyecto desde tu navegador en `http://localhost/Edulinker-Class`.
+
+---
+
+## **Instalacion Linux**
+
+1. Clona este repositorio o descargalo como archivo ZIP.
+2. Coloca los archivos en el directorio raiz de tu servidor web (por ejemplo, `/var/www/html/`).
+3. Crea una base de datos en tu servidor MySQL llamada 'edulinker' e importele los datos del archivo `blog_academico.sql`.
+4. Configura la conexion a la base de datos en `.env`.
+5. Acceda al proyecto desde tu navelados `http://localhost/Edulinker-Class`.
 
 ---
 
